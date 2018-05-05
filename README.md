@@ -1,2 +1,2 @@
-# Python-note
-Python study note
+# Notes
+*学习笔记记录
