@@ -45,9 +45,8 @@ target/
 *.class
 classes/
 .classpath
-/bin
+#/bin
 *.swp
 .DS_Store
 .DS_Store?
 velocity.log*
-venv/
