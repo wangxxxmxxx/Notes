@@ -1,0 +1,9 @@
+1-线程存在类似于银行转账的安全问题
+2-线程互斥技术通过synchronized实现，是否互斥在于持有的锁
+	其中静态方法使用该关键字，默认持有的锁是xxx.class
+	成员方法使用该关键字，默认持有的锁是该类的实例化对象this
+	同步代码块中使用该关键字，锁是obj，当然obj可以按照需求传入xxx.class，this以及其他对象
+	synchronized (obj) 
+	{
+		//do something
+	}
