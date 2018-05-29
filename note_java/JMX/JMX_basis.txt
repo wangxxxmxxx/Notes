@@ -172,6 +172,110 @@
 						mbsc.invoke(mbeanName, "helloWorld", null, null);
 					}
 				}
+6-Notification
+	MBean之间的通信是必不可少的，Notification就起到了在MBean之间沟通桥梁的作用。JMX 的通知由四部分组成：
+		1、Notification这个相当于一个信息包，封装了需要传递的信息
+		2、Notification broadcaster这个相当于一个广播器，把消息广播出。
+		3、Notification listener 这是一个监听器，用于监听广播出来的通知信息。
+		4、Notification filiter 这个一个过滤器，过滤掉不需要的通知。这个一般很少使用。
+	这里我们使用日常打招呼的场景：jack与我偶遇，jack说：hi；我礼貌的回答：hello，jack。
+	这里我们先分别创建两个资源：
+		1、public interface HelloMBean {
+			public String getName();
+			public void setName(String name);
+			public void printHello();
+			public void printHello(String whoName);
+			public void returnHello(String message);
+		}
+		2、public class Hello extends NotificationBroadcasterSupport implements HelloMBean
+		{
+			private int seq = 0;
+		    private String name;
+		    public String getName()
+		    {
+		        return name;
+		    }
+		    public void setName(String name)
+		    {
+		        this.name = name;
+		    }
+		    public void printHello()
+		    {
+		        System.out.println("Hello World, " + name);
+		    }
+		    public void printHello(String whoName)
+		    {
+		        System.out.println("Hello , " + whoName);
+		    }
+			public void returnHello(String message) {
+				Notification notify = 
+			            //通知名称；谁发起的通知；序列号；发起通知时间；发送的消息
+			            new Notification("jack.hi",this,++seq,System.currentTimeMillis(),"hi,hello");
+			        sendNotification(notify);
+			}
+		}
+		3、public interface JackMBean
+		{
+		    public void hi();
+		    public void println(String message);
+		}
+		4、public class Jack extends NotificationBroadcasterSupport implements JackMBean
+		{
+		    private int seq = 0;
+		    public void hi()
+		    {
+		         //创建一个信息包
+		        Notification notify = 
+		            //通知名称；谁发起的通知；序列号；发起通知时间；发送的消息
+		            new Notification("jack.hi",this,++seq,System.currentTimeMillis(),"hi,hello");
+		        sendNotification(notify);
+		    }
+			public void println(String message) {
+				System.out.println(message);
+			}
+		}
+		5、public class HelloListener implements NotificationListener
+		{
+
+		    public void handleNotification(Notification notification, Object handback)
+		    {
+		        if(handback instanceof Hello)
+		        {
+		            Hello hello = (Hello)handback;
+		            hello.printHello("Hello receive message: " + notification.getMessage());
+		            hello.returnHello("hi,jack");
+		        }
+		    }
+		    
+		}
+		6、public class JackListener implements NotificationListener
+		{
+
+		    public void handleNotification(Notification notification, Object handback)
+		    {
+		        if(handback instanceof Jack)
+		        {
+		        	Jack jack = (Jack)handback;
+		        	jack.println("Jack receive message: " + notification.getMessage());
+		        }
+		    }
+		    
+		}
+		7、public class HelloAgent {
+			public static void main(String[] args) throws JMException, Exception {
+				 MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+				 ObjectName helloName = new ObjectName("yunge:name=Hello");
+				 Hello hello=new Hello();
+				 server.registerMBean(hello, helloName);
+				 Jack jack = new Jack();
+				 server.registerMBean(jack, new ObjectName("jack:name=Jack"));
+				 jack.addNotificationListener(new HelloListener(), null, hello);
+				 hello.addNotificationListener(new JackListener(), null, jack);
+				 Thread.sleep(500000);
+			}
+		}
+7、更多请查看工程
+	JMXTest.zip
 
 
 
