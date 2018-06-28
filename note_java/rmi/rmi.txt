@@ -112,24 +112,98 @@ Java RMI用于不同虚拟机之间的通信，这些虚拟机可以在不同的
 			如果没有该字段，则默认该类会随机生成一个整数，且在客户端和服务器生成的整数不相同，则会抛出异常如下：
 				java.rmi.UnmarshalException:error unmarshaling return;
 			而且在服务器和客户端这个字段必须保持一致才能进行反序列化，如果两端都有该字段，但是数据不一致，则会抛出异常如下:
-				java.rmi.UnmarshalException:error unmarshaling return;
+				java.rmi.UnmarshalException: error unmarshalling return; nested exception is: 
+	java.io.InvalidClassException: rmi.domain.User; local class incompatible: stream classdesc serialVersionUID = 42, local class serialVersionUID = 41
 		3-这个类在服务器和客户端都必须可用；
 		4-在序列化的时候，如果在字段前加入了transient关键字，则该数据不会被序列化；
 	2.2.2 构建注册表
-	注册表其实不用写任何代码，在你的JAVA_HOME下bin目录下有一个rmiregistry.exe程序，需要在你的程序的classpath下运行该程序。
-	在启动服务器的时候，实际上需要运行两个服务器：
-		一个是远程对象本身；
-		一个是允许客户端下载远程对象引用的注册表；
-	由于远程对象需要与注册表对话，所以必须首先启动注册表程序。当注册表程序没有启动的时候，如果强行启动远程对象服务器时，会抛出如下错误：
-		java.rmi.ConnectException: Connection refused to host: 192.168.1.6; nested exception is: 
-	确保远程对象类可以被注册表程序发现(注意要在类路径下运行)，当远程对象类没有被注册表程序发现时，则会发现如下错误：
-		java.rmi.ServerException: RemoteException occurred  in server thread
+		注册表其实不用写任何代码，在你的JAVA_HOME下bin目录下有一个rmiregistry.exe程序，需要在你的程序的classpath下运行该程序。
+		在启动服务器的时候，实际上需要运行两个服务器：
+			一个是远程对象本身；
+			一个是允许客户端下载远程对象引用的注册表；
+		由于远程对象需要与注册表对话，所以必须首先启动注册表程序。当注册表程序没有启动的时候，如果强行启动远程对象服务器时，会抛出如下错误：
+			java.rmi.ConnectException: Connection refused to host: 192.168.1.6; nested exception is: 
+		确保远程对象类可以被注册表程序发现(注意要在类路径下运行)，当远程对象类没有被注册表程序发现时，则会发现如下错误：
+			java.rmi.ServerException: RemoteException occurred  in server thread
 
-	如果是使用maven管理工程，则在target/classes目录中启动该程序。
-	这说明注册表程序时运行在一个单独的进程中的，它作为一个第三方的组件，来协调客户端和服务器之间的通信，但是与它们两个之间是完全解决解耦的。
+		如果是使用maven管理工程，则在target/classes目录中启动该程序。
+		这说明注册表程序时运行在一个单独的进程中的，它作为一个第三方的组件，来协调客户端和服务器之间的通信，但是与它们两个之间是完全解决解耦的。
 
-	rmiregistry.exe默认情况下是监听1099端口，如果已经该端口已经被使用了，可以通过命令
-		rmiregistry 1020 
-			指定其他的端口来运行。
-			可以通过start rmiregistry命令在后台运行
-	运行完注册表程序后，就可以运行远程对象所在的服务器，以便接受客户端的连接。
+		rmiregistry.exe默认情况下是监听1099端口，如果已经该端口已经被使用了，可以通过命令
+			rmiregistry 1020 
+				指定其他的端口来运行。
+				可以通过start rmiregistry命令在后台运行
+		运行完注册表程序后，就可以运行远程对象所在的服务器，以便接受客户端的连接。
+	2.2.3 构建客户端
+		客户端的代码如下：
+			public class RmiClient {
+				public static void main(String[] args) {
+					try {
+					    UserHandler handler = (UserHandler) Naming.lookup("user");
+					    int  count = handler.getUserCount();
+					    String name = handler.getUserName(1);
+					    System.out.println("name: " + name);
+					    System.out.println("count: " + count);
+					    System.out.println("user: " + handler.getUserByName("lmy86263"));
+					} catch (NotBoundException e) {
+					    e.printStackTrace();
+					} catch (MalformedURLException e) {
+					    e.printStackTrace();
+					} catch (RemoteException e) {
+					    e.printStackTrace();
+					}
+				}
+			}
+		在上边的代码中通过Naming.lookup(...)获取该远程对象的引用。这个方法通过一个指定的名称来获取，该名称必须与远程对象服务器绑定的名称一致。可以通过Naming.list(...)方法列出所有可用的远程对象。
+
+		在使用客户端连接服务器调用远程方法的时候，需要注意的问题如下：
+		1-UserHandler类在客户端本地必须可用，不然无法指定要调用的方法，而且其全限定名必须与服务器上的对象完全相同，不然抛出如下异常：
+			java.rmi.ServerException: RemoteException occurred in server thread; nested exception is: 
+				java.rmi.UnmarshalException: unrecognized method hash: method not supported by remote object
+		2-从注册表中获取的对象引用已经失去类型信息，需要强制转化为远程对象类型。这样运行客户端的时候才能获得相应的响应；
+		3-如果在方法中使用到了引用类型，比如这里的User，那么该类型的全限定名也必须与服务器的相同，如果不相同则会抛出如下异常：
+			java.rmi.ServerException: RemoteException occurred  in server thread
+		4-客户端的引用类型的serialVersionUID字段要与服务器端的对象保持一致；
+	2.3 基本实现之二（服务端运行注册表程序）
+		对于实现二，和实现一的主要区别在注册表程序的运行，不再是通过rmiregistry.exe单独运行，而是通过编程来实现，而远程接口以及其实现类与实现一完全相同。
+
+		这里注册表的实现是通过java.rmi.registry包中的Registry接口和以及其实现类LocateRegistry来完成的。如果你详细查看JDK的源码的话，就会发现其实我们之前使用的java.rmi.Naming类中的方法实际上都是间接通过Registry和LocateRegistry实现的。
+
+		其中获取根据主机和端口获取注册表引用的源码如下：
+			/**
+			* Returns a registry reference obtained from information in the URL.
+			*/
+			private static Registry getRegistry(ParsedNamingURL parsed) throws RemoteException {
+			    return LocateRegistry.getRegistry(parsed.host, parsed.port);
+			}
+		而且Naming中的方法和Registry中是一一对应的。
+
+		而如果要创建一个注册表，这里要使用的是LocateRegistry，该类中只要两类方法：
+		1-创建本地注册表并且获取该注册表的引用；
+			createRegistry(int port)
+			createRegistry(int port, RMIClientSocketFactory csf, RMIServerSocketFactory ssf)
+		2-直接获取注册表引用，该注册表可以是本地运行的，也可以是远程运行的，这类方法是不能够创建注册表的，只能等注册表程序运行起来之后，和它进行通信来获取引用，否则抛出异常如下：
+			java.rmi.ConnectException: Connection refused to host: 192.168.1.6; nested exception is: 
+			其中的方法如下：
+				getRegistry()
+				getRegistry(int port)
+				getRegistry(String host)
+				getRegistry(String host, int port)
+				getRegistry(String host, int port, RMIClientSocketFactory csf)
+			由于是可能从远程主机获取注册表引用，因此可能需要指定Socket套接字来和远程主机进行沟通，在这个过程中也有可能因为各种原因造成调用过程失败；
+		运行远程对象的服务器代码如下：
+			public class RunRmi {
+				public static void main(String[] args) {
+					UserHandler userHandler = null;
+					Registry registry = null;
+					try {
+					    registry = LocateRegistry.createRegistry(1099);
+						userHandler = new UserHandlerImpl();
+						registry.rebind("user", userHandler);
+					    System.out.println(" rmi server is ready ...");
+					} catch (Exception e) {
+					    e.printStackTrace();
+					}
+				}
+			}
+		除此之外，其他服务器端和客户端的代码与实现一完全相同。
