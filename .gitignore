@@ -50,3 +50,4 @@ classes/
 .DS_Store
 .DS_Store?
 velocity.log*
+/note_python/.idea/

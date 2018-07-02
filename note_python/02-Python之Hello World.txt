@@ -1,0 +1,18 @@
+1、 官网下载地址
+	https://www.python.org/downloads/
+	ps.windows安装注意添加环境变量，linux、mac自带python环境
+2、通过命令行，输入python进入python解释器环境
+	输入:
+		print("Hello World!") #回车
+		exit() #回车退出
+3、py文件执行
+	windows下内容：
+		print("Hello World")  #保存为helloworld.py
+		进入命令行，输入python helloworld.py 回车执行
+	linux下内容：
+		#!/usr/bin/env python 
+		#或者#!/usr/bin/python  #类比shell中的声明来理解，即如果想要类似于执行shell脚本一样执行python脚本，例： ./hello.py ，那么就需要在 hello.py 文件的头部指定解释器，如下：
+		print("Hello World")
+4、开发工具 pycharm
+	1-脚本模板修改位置
+		File->Settings->Editor->File and Code Templates->Python Script

@@ -106,3 +106,12 @@
 	Python 3.3 - September 29, 2012
 	Python 3.4 - March 16, 2014
 	Python 3.5 - September 13, 2015
+5、Python 2 or 3?
+	In summary : Python 2.x is legacy, Python 3.x is the present and future of the language
+	Python 3.0 was released in 2008. The final 2.x version 2.7 release came out in mid-2010, with a statement of
+	extended support for this end-of-life release. The 2.x branch will see no new major releases after that. 3.x is
+	under active development and has already seen over five years of stable releases, including version 3.3 in 2012,
+	3.4 in 2014, and 3.5 in 2015. This means that all recent standard library improvements, for example, are only
+	available by default in Python 3.x.
+	Guido van Rossum (the original creator of the Python language) decided to clean up Python 2.x properly, with less regard for backwards compatibility than is the case for new releases in the 2.x range. The most drastic improvement is the better Unicode support (with all text strings being Unicode by default) as well as saner bytes/Unicode separation.
+	Besides, several aspects of the core language (such as print and exec being statements, integers using floor division) have been adjusted to be easier for newcomers to learn and to be more consistent with the rest of the language, and old cruft has been removed (for example, all classes are now new-style, "range()" returns a memory efficient iterable, not a list as in 2.x). 
