@@ -29,4 +29,18 @@ for i in range(3):
 else:
     print("you tried too many times!")
 
+# for用法
+for i in range(2, 10, 3):    # args start stop step, 两个参数step默认为1
+    print("loop:", i)
+
+# continue
+for i in range(0, 5):
+    if i < 3 or i > 3:
+        print("loop--:", i)
+    else:
+        continue
+    print("he he")
+
+
+
 
