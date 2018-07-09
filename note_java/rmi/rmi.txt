@@ -41,81 +41,81 @@ Java RMI用于不同虚拟机之间的通信，这些虚拟机可以在不同的
 	其实在RMI中的客户端和服务端并没有绝对的界限，与Web应用中的客户端和服务器还是有区别的。这两者其实是平等的，客户端可以为服务端提供远程调用的方法，这时候，原来的客户端就是服务器端。
 2.2 基本实现之一（注册表单独运行）
 	2.2.1 构建服务器端
-	1-什么是远程对象？首先从名称上来看，远程对象是存在于服务端以供客户端调用。那么什么对象可以被客户端进行远程调用？这个问题从编程的角度来看，实现了java.rmi.Remote接口的类或者继承了java.rmi.Remote接口的所有接口都是远程对象。这些继承或者实现了该接口的类或者接口中定义了客户端可以访问的方法。这个远程对象中可能有很多个方法，但是只有在远程接口中声明的方法才能从远程调用，其他的公共方法只能在本地虚拟机中使用。
-	2-实现过程中的注意事项：
-		子接口的每个方法都必须声明抛出java.rmi.RemoteException异常，该异常是使用RMI时可能抛出的大多数异常的父类。
-		子接口的实现类应该直接或者间接继承java.rmi.server.UnicastRemoteObject类，该类提供了很多支持RMI的方法，具体来说，这些方法可以通过JRMP协议导出一个远程对象的引用，并通过动态代理构建一个可以和远程对象交互的Stub对象。具体的实现看如下的例子。
-		首先远程接口如下：
-			public interface UserHandler extends Remote {
-			    String getUserName(int id) throws RemoteException;
-			    int getUserCount() throws RemoteException;
-			    User getUserByName(String name) throws RemoteException;
-			}
+		1-什么是远程对象？首先从名称上来看，远程对象是存在于服务端以供客户端调用。那么什么对象可以被客户端进行远程调用？这个问题从编程的角度来看，实现了java.rmi.Remote接口的类或者继承了java.rmi.Remote接口的所有接口都是远程对象。这些继承或者实现了该接口的类或者接口中定义了客户端可以访问的方法。这个远程对象中可能有很多个方法，但是只有在远程接口中声明的方法才能从远程调用，其他的公共方法只能在本地虚拟机中使用。
+		2-实现过程中的注意事项：
+			子接口的每个方法都必须声明抛出java.rmi.RemoteException异常，该异常是使用RMI时可能抛出的大多数异常的父类。
+			子接口的实现类应该直接或者间接继承java.rmi.server.UnicastRemoteObject类，该类提供了很多支持RMI的方法，具体来说，这些方法可以通过JRMP协议导出一个远程对象的引用，并通过动态代理构建一个可以和远程对象交互的Stub对象。具体的实现看如下的例子。
+			首先远程接口如下：
+				public interface UserHandler extends Remote {
+				    String getUserName(int id) throws RemoteException;
+				    int getUserCount() throws RemoteException;
+				    User getUserByName(String name) throws RemoteException;
+				}
 
-		远程接口的实现类如下：
-			public class UserHandlerImpl extends UnicastRemoteObject implements UserHandler {
-			    // 该构造期必须存在，因为集继承了UnicastRemoteObject类，其构造器要抛出RemoteException
-			    public UserHandlerImpl() throws RemoteException {
-			        super();
-			    }
+			远程接口的实现类如下：
+				public class UserHandlerImpl extends UnicastRemoteObject implements UserHandler {
+				    // 该构造期必须存在，因为集继承了UnicastRemoteObject类，其构造器要抛出RemoteException
+				    public UserHandlerImpl() throws RemoteException {
+				        super();
+				    }
 
-			    @Override
-			    public String getUserName(int id) throws RemoteException {
-			        return "lmy86263";
-			    }
-			    @Override
-			    public int getUserCount() throws RemoteException{
-			        return 1;
-			    }
-			    @Override
-			    public User getUserByName(String name) throws RemoteException{
-			        return new User("lmy86263", 1);
-			    }
-			}
+				    @Override
+				    public String getUserName(int id) throws RemoteException {
+				        return "lmy86263";
+				    }
+				    @Override
+				    public int getUserCount() throws RemoteException{
+				        return 1;
+				    }
+				    @Override
+				    public User getUserByName(String name) throws RemoteException{
+				        return new User("lmy86263", 1);
+				    }
+				}
 
-		为了测试在使用RMI的序列化的问题，这里特别设置了一个引用类型User：
-			public class User implements Serializable {
-			    // 该字段必须存在
-			    private static final long serialVersionUID = 42L;
-			    // setter和getter可以没有
-			    String name;
-			    int id;
+			为了测试在使用RMI的序列化的问题，这里特别设置了一个引用类型User：
+				public class User implements Serializable {
+				    // 该字段必须存在
+				    private static final long serialVersionUID = 42L;
+				    // setter和getter可以没有
+				    String name;
+				    int id;
 
-			    public User(String name, int id) {
-			        this.name = name;
-			        this.id = id;
-			    }
-			}
+				    public User(String name, int id) {
+				        this.name = name;
+				        this.id = id;
+				    }
+				}
 
-		在Java 1.4及 以前的版本中需要手动建立Stub对象，通过运行rmic命令来生成远程对象实现类的Stub对象，但是在Java 1.5之后可以通过动态代理来完成，不再需要这个过程了。
+			在Java 1.4及 以前的版本中需要手动建立Stub对象，通过运行rmic命令来生成远程对象实现类的Stub对象，但是在Java 1.5之后可以通过动态代理来完成，不再需要这个过程了。
 
-		运行该远程对象的服务器代码如下：
-			public class RunRmi {
-				public static void main(String[] args) {
-					UserHandler userHandler = null;
-					try {
-						userHandler = new UserHandlerImpl();
-					    Naming.rebind("user", userHandler);
-					    System.out.println(" rmi server is ready ...");
-					} catch (Exception e) {
-					    e.printStackTrace();
+			运行该远程对象的服务器代码如下：
+				public class RunRmi {
+					public static void main(String[] args) {
+						UserHandler userHandler = null;
+						try {
+							userHandler = new UserHandlerImpl();
+						    Naming.rebind("user", userHandler);
+						    System.out.println(" rmi server is ready ...");
+						} catch (Exception e) {
+						    e.printStackTrace();
+						}
 					}
 				}
-			}
-		这里面的核心代码为Naming.rebind("user", userHandler) ，通过一个名称映射到该远程对象的引用，客户端通过该名称获取该远程对象的引用。
+			这里面的核心代码为Naming.rebind("user", userHandler) ，通过一个名称映射到该远程对象的引用，客户端通过该名称获取该远程对象的引用。
 
-		在远程对象中有三个方法：getUserName(int id) 和getUserCount()的参数和返回结果都是基本类型，因此是默认序列化的，但是对于getUserByName(String name)方法，返回的结果是一个引用类型，因此会涉及到序列化与反序列的问题，对于User类，必须满足以下条件：
+			在远程对象中有三个方法：getUserName(int id) 和getUserCount()的参数和返回结果都是基本类型，因此是默认序列化的，但是对于getUserByName(String name)方法，返回的结果是一个引用类型，因此会涉及到序列化与反序列的问题，对于User类，必须满足以下条件：
 
-		1-必须实现java.io.Serializable接口；
-		2-其中必须有serialVersionUID字段，格式如下：
-			private static final long serialVersionUID = 42L;
-			如果没有该字段，则默认该类会随机生成一个整数，且在客户端和服务器生成的整数不相同，则会抛出异常如下：
-				java.rmi.UnmarshalException:error unmarshaling return;
-			而且在服务器和客户端这个字段必须保持一致才能进行反序列化，如果两端都有该字段，但是数据不一致，则会抛出异常如下:
-				java.rmi.UnmarshalException: error unmarshalling return; nested exception is: 
-	java.io.InvalidClassException: rmi.domain.User; local class incompatible: stream classdesc serialVersionUID = 42, local class serialVersionUID = 41
-		3-这个类在服务器和客户端都必须可用；
-		4-在序列化的时候，如果在字段前加入了transient关键字，则该数据不会被序列化；
+			1-必须实现java.io.Serializable接口；
+			2-其中必须有serialVersionUID字段，格式如下：
+				private static final long serialVersionUID = 42L;
+				如果没有该字段，则默认该类会随机生成一个整数，且在客户端和服务器生成的整数不相同，则会抛出异常如下：
+					java.rmi.UnmarshalException:error unmarshaling return;
+				而且在服务器和客户端这个字段必须保持一致才能进行反序列化，如果两端都有该字段，但是数据不一致，则会抛出异常如下:
+					java.rmi.UnmarshalException: error unmarshalling return; nested exception is: 
+		java.io.InvalidClassException: rmi.domain.User; local class incompatible: stream classdesc serialVersionUID = 42, local class serialVersionUID = 41
+			3-这个类在服务器和客户端都必须可用；
+			4-在序列化的时候，如果在字段前加入了transient关键字，则该数据不会被序列化；
 	2.2.2 构建注册表
 		注册表其实不用写任何代码，在你的JAVA_HOME下bin目录下有一个rmiregistry.exe程序，需要在你的程序的classpath下运行该程序。
 		在启动服务器的时候，实际上需要运行两个服务器：
@@ -164,46 +164,46 @@ Java RMI用于不同虚拟机之间的通信，这些虚拟机可以在不同的
 		3-如果在方法中使用到了引用类型，比如这里的User，那么该类型的全限定名也必须与服务器的相同，如果不相同则会抛出如下异常：
 			java.rmi.ServerException: RemoteException occurred  in server thread
 		4-客户端的引用类型的serialVersionUID字段要与服务器端的对象保持一致；
-	2.3 基本实现之二（服务端运行注册表程序）
-		对于实现二，和实现一的主要区别在注册表程序的运行，不再是通过rmiregistry.exe单独运行，而是通过编程来实现，而远程接口以及其实现类与实现一完全相同。
+2.3 基本实现之二（服务端运行注册表程序）
+	对于实现二，和实现一的主要区别在注册表程序的运行，不再是通过rmiregistry.exe单独运行，而是通过编程来实现，而远程接口以及其实现类与实现一完全相同。
 
-		这里注册表的实现是通过java.rmi.registry包中的Registry接口和以及其实现类LocateRegistry来完成的。如果你详细查看JDK的源码的话，就会发现其实我们之前使用的java.rmi.Naming类中的方法实际上都是间接通过Registry和LocateRegistry实现的。
+	这里注册表的实现是通过java.rmi.registry包中的Registry接口和以及其实现类LocateRegistry来完成的。如果你详细查看JDK的源码的话，就会发现其实我们之前使用的java.rmi.Naming类中的方法实际上都是间接通过Registry和LocateRegistry实现的。
 
-		其中获取根据主机和端口获取注册表引用的源码如下：
-			/**
-			* Returns a registry reference obtained from information in the URL.
-			*/
-			private static Registry getRegistry(ParsedNamingURL parsed) throws RemoteException {
-			    return LocateRegistry.getRegistry(parsed.host, parsed.port);
-			}
-		而且Naming中的方法和Registry中是一一对应的。
+	其中获取根据主机和端口获取注册表引用的源码如下：
+		/**
+		* Returns a registry reference obtained from information in the URL.
+		*/
+		private static Registry getRegistry(ParsedNamingURL parsed) throws RemoteException {
+		    return LocateRegistry.getRegistry(parsed.host, parsed.port);
+		}
+	而且Naming中的方法和Registry中是一一对应的。
 
-		而如果要创建一个注册表，这里要使用的是LocateRegistry，该类中只要两类方法：
-		1-创建本地注册表并且获取该注册表的引用；
-			createRegistry(int port)
-			createRegistry(int port, RMIClientSocketFactory csf, RMIServerSocketFactory ssf)
-		2-直接获取注册表引用，该注册表可以是本地运行的，也可以是远程运行的，这类方法是不能够创建注册表的，只能等注册表程序运行起来之后，和它进行通信来获取引用，否则抛出异常如下：
-			java.rmi.ConnectException: Connection refused to host: 192.168.1.6; nested exception is: 
-			其中的方法如下：
-				getRegistry()
-				getRegistry(int port)
-				getRegistry(String host)
-				getRegistry(String host, int port)
-				getRegistry(String host, int port, RMIClientSocketFactory csf)
-			由于是可能从远程主机获取注册表引用，因此可能需要指定Socket套接字来和远程主机进行沟通，在这个过程中也有可能因为各种原因造成调用过程失败；
-		运行远程对象的服务器代码如下：
-			public class RunRmi {
-				public static void main(String[] args) {
-					UserHandler userHandler = null;
-					Registry registry = null;
-					try {
-					    registry = LocateRegistry.createRegistry(1099);
-						userHandler = new UserHandlerImpl();
-						registry.rebind("user", userHandler);
-					    System.out.println(" rmi server is ready ...");
-					} catch (Exception e) {
-					    e.printStackTrace();
-					}
+	而如果要创建一个注册表，这里要使用的是LocateRegistry，该类中只要两类方法：
+	1-创建本地注册表并且获取该注册表的引用；
+		createRegistry(int port)
+		createRegistry(int port, RMIClientSocketFactory csf, RMIServerSocketFactory ssf)
+	2-直接获取注册表引用，该注册表可以是本地运行的，也可以是远程运行的，这类方法是不能够创建注册表的，只能等注册表程序运行起来之后，和它进行通信来获取引用，否则抛出异常如下：
+		java.rmi.ConnectException: Connection refused to host: 192.168.1.6; nested exception is: 
+		其中的方法如下：
+			getRegistry()
+			getRegistry(int port)
+			getRegistry(String host)
+			getRegistry(String host, int port)
+			getRegistry(String host, int port, RMIClientSocketFactory csf)
+		由于是可能从远程主机获取注册表引用，因此可能需要指定Socket套接字来和远程主机进行沟通，在这个过程中也有可能因为各种原因造成调用过程失败；
+	运行远程对象的服务器代码如下：
+		public class RunRmi {
+			public static void main(String[] args) {
+				UserHandler userHandler = null;
+				Registry registry = null;
+				try {
+				    registry = LocateRegistry.createRegistry(1099);
+					userHandler = new UserHandlerImpl();
+					registry.rebind("user", userHandler);
+				    System.out.println(" rmi server is ready ...");
+				} catch (Exception e) {
+				    e.printStackTrace();
 				}
 			}
-		除此之外，其他服务器端和客户端的代码与实现一完全相同。
+		}
+	除此之外，其他服务器端和客户端的代码与实现一完全相同。
