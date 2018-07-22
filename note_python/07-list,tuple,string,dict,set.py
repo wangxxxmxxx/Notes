@@ -354,7 +354,7 @@ t.discard(1)              # Remove an element from a set if it is a member. If t
 print(t)
 t.pop()
 print(t)
-del t[0]
+# del t[0]                # 不支持 TypeError: 'set' object doesn't support item deletion
 print(len(s))             # set的长度
 print('x' in s )          # 测试x是否是s的成员
 print('x' not in s)       # 测试x是否不是s的成员

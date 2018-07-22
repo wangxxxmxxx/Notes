@@ -139,12 +139,14 @@ python成员运算符
 in	    如果在指定的序列中找到值返回 true，否则返回 false。	    x 在 y 序列中 , 如果 x 在 y 序列中返回 true。
 not in	如果在指定的序列中没有找到值返回 true，否则返回 false。	x 不在 y 序列中 , 如果 x 不在 y 序列中返回 true。
 '''
-a = 1
+a = 2
 num_list = [1, 2, 3, 4, 5]
 if a in num_list:
     print("变量 a 在给定的列表中 list 中")
 else:
     print("变量 a 不在给定的列表中 list 中")
+print("字符串是否在字符串内：")
+print("abcde" in "cdabcdedr")
 '''
 Python身份运算符
 身份运算符用于比较两个对象的存储单元

@@ -22,8 +22,9 @@ dir_res_location = os.popen("dir")    # 保存执行显示内容的地址
 print("Location:", dir_res_location)
 dir_res_location_content = dir_res_location.read()    # 读取内容
 print("ResultContent:", dir_res_location_content)
-
-os.mkdir("newDir")      # 创建目录
+if not os.path.exists("newDir"):
+    print("create dir:")
+    os.mkdir("newDir")      # 创建目录
 ########################################################################################
 # 导入自己写的模块，保存在成 模块名.py 即可
 # 然后导入，注意模块的位置需要在 sys.path 下
