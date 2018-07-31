@@ -58,7 +58,20 @@ python2解释器在加载 .py 文件中的代码时，会对内容进行编码�
 python3解释器在加载 .py 文件中对内容进行编码（默认UTF-8）
 
 所以如果包含中文，python执行需要在开头加上# -*- coding: utf-8 -*-
-    显示的告诉python解释器，用什么编码来执行源代码      
+    显示的告诉python解释器，用什么编码来执行源代码   
+
+PS:
+1.在python2默认编码是ASCII, python3里默认是unicode
+2.unicode 分为 utf-32(占4个字节),utf-16(占两个字节)，utf-8(占1-4个字节)， 
+    so utf-16就是现在最常用的unicode版本， 不过在文件里存的还是utf-8，因为utf8省空间
+3.在py3中encode,在转码的同时还会把string 变成bytes类型，
+    decode在解码的同时还会把bytes变回string  
+    
+编码问题博客：
+http://www.cnblogs.com/yuanchenqi/articles/5956943.html
+http://www.diveintopython3.net/strings.html 
+理解图片：codeFlow.PNG
+
 '''
 chn = "中文"
 print(chn)
