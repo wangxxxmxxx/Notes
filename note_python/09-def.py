@@ -14,8 +14,7 @@ def say_hi():
     print("Hello")
 
 
-returnSayhi = say_hi()    # 调用函数
-print(returnSayhi)       # 注意返回值为None
+say_hi()    # 调用函数
 
 
 def logger():                                 # 函数书写规范，定义前后要空两行
@@ -71,14 +70,15 @@ print(z)        # 返回值数>1，返回tuple
 print("参数：")
 
 
-def test(x, y, z):
+def test(x, y):
     print(x)
     print(y)
-    print(z)
 
-test(y=2, x=1)         #与形参顺序无关
-test(1,2)             #与形参一一对应
-test(x=2, 3)
-test(3, z=2, y=6)
+
+test(y=2, x=1)        # 关键字调用，与形参顺序无关
+test(1, 2)            # 位置调用，与形参一一对应
+# test(x=2, 3)        # 错误调用方式 positional argument follows keyword argument  关键参数是不能写到位置参数前面的
+test(3, y=2)
+
 
 
