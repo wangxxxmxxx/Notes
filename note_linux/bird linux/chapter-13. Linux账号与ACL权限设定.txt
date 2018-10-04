@@ -71,4 +71,14 @@
 				authconfig --test | grep hashing
 	3）关于群组：有效与初始群组和groups, newgrp
 		1-/etc/group文件结构
-
+			1.每一行都代表一个群组，通过冒号分隔，共四列，分别代表：
+				a-组名
+				b-群组密码
+					通常不需要设定，这个设定通常给群组管理员使用，目前很少会设定群组管理员。同样，密码已经移动到/etc/gshadow 中，因此这个字段只存在一个x
+				c-GID
+					/etc/passwd第四个字段使用的GID对应的群组名，由这里关联出来
+				d-此群组支持的账号名称
+					一个账号可以加入多个群组，那某个账号想要加入此群组时，将该账号填入这个字段即可。举例来说，如果我想要让dmtsai 与alex加入root这个群组，第一行的最后面加上dmtsai,alex，注意不要有空格，即root:x:0:dmtsai,alex
+			2.有效群组(effective group)与初始群组(initial group)
+				a-/etc/group第四栏可以有多个用户，也就是一个用户可以加入多个群组，那么该用户需要以一个群组为主群组
+				b-/etc/passwd里面的第四栏的GID 就是初始群组(initial group)即：用户一登入系统，立刻就拥有这个群组的相关权限的意思

@@ -64,7 +64,7 @@
 		Thread#run()<-------------------------------------------- 
 		Java线程的start方法会创建一个本地线程（通过调用JVM_StartThread），该线程的线程函数是定义在jvm.cpp中的thread_entry，由其再进一步回调run方法。
 2-创建线程方法一：
-	默认情况下，我们通过不实例化Thread，而是实例化Thread的一个子类，因为Thread的run方法如下：
+	默认情况下，我们通常不实例化Thread，而是实例化Thread的一个子类，因为Thread的run方法如下：
 		@Override
 	    public void run() {
 	        if (target != null) {
