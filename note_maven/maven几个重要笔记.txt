@@ -109,3 +109,13 @@
             </plugin>
         </plugins>
     </build>
+
+3、 archetype模版化
+a)生成一个archetype
+i.  mvn archetype:create-from-project
+ii. cd /target/generated-sources/archetype
+iii. mvn install
+b)  从archetype创建项目 
+进入生成文件目录：
+mvn archetype:generate -DarchetypeCatalog=local
+按照提示输入
