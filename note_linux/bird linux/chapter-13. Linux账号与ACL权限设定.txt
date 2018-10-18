@@ -80,5 +80,120 @@
 				d-此群组支持的账号名称
 					一个账号可以加入多个群组，那某个账号想要加入此群组时，将该账号填入这个字段即可。举例来说，如果我想要让dmtsai 与alex加入root这个群组，第一行的最后面加上dmtsai,alex，注意不要有空格，即root:x:0:dmtsai,alex
 			2.有效群组(effective group)与初始群组(initial group)
-				a-/etc/group第四栏可以有多个用户，也就是一个用户可以加入多个群组，那么该用户需要以一个群组为主群组
+				a-/etc/group第四栏可以有多个用户，也就是一个用户可以加入多个群组，那么该用户需要以一个群组为主群组，如果一个用户初始群组是某一个群组，该用户不用将用户名写入/etc/group第四个字段
 				b-/etc/passwd里面的第四栏的GID 就是初始群组(initial group)即：用户一登入系统，立刻就拥有这个群组的相关权限的意思
+				c-使用者登录后，输入groups可以查看支持群组，输出的数据中第一个输出的即是有效群组，创建文件使用的是有效群组
+				d-使用newgrp groupname 可以切换用户有效群组，但是后面接的群组名需要是自己支持的群组，需要注意，使用newgrp，是在原本的shell中有开启了一个子shell，离开这个newgrp环境，记得使用exit退出。
+		2-/etc/gshadow
+			1.用来建立群组管理员，root用户忙碌时，当有使用者想要加入某些群组时，该群组的群组管理员就能够将那个账号加入自己管理的群组中！不过，由于目前有类似sudo之类的工具，群组管理员的功能已很少使用。操作具体见gpasswd介绍。这个文件内容通过冒号分隔
+				a-组名
+				b-密码栏，同样的，开头为!表示无合法密码，表示无群组管理员
+				c-群组管理员的账号
+				c-有加入该群组支持的所属账号号(与/etc/group 内容相同！)
+2、账号管理
+	1）新增与移除使用者： useradd, 相关配置文件, passwd, usermod, userdel
+		1. useradd [-u UID] [-g 初始群组] [-G 次要群组] [-mM] [-c 说明栏] [-d 家目录绝对路径] [-s shell] 使用者账号名
+			1-选项与参数：
+				-u ：后面接的是UID，是一组数字。直接指定一个特定的 UID 给这个账号
+				-g ：后面接的那个组名initial group，该群组的GID会被放置到/etc/passwd的第四个字段内。
+				-G ：后面接的组名则是这个账号还可以加入的群组。这个选项与参数会修改 /etc/group 内的相关资料
+				-M ：强制！不要建立用户家目录！(系统账号默认值)
+				-m ：强制！要建立用户家目录！(一般账号默认值)
+				-c ：这个就是 /etc/passwd 的第五栏的说明内容，可以随便设定
+				-d ：指定某个目录成为家目录，而不要使用默认值。务必使用绝对路径！
+				-r ：建立一个系统的账号，这个账号的 UID 会有限制 (参考 /etc/login.defs)
+				-s ：后面接一个 shell ，若没有指定则预设是 /bin/bash
+				-e ：后面接一个日期，格式为『YYYY-MM-DD』此项目可写入 shadow 第八字段，即账号失效日的设定
+				-f ：后面接 shadow 的第七字段项目，指定密码是否会失效。0 为立刻失效，-1 为永远不失效(密码只会过期而强制于登入时重新设定而已。)
+			2-eg:
+				创建一个用户：
+					$ useradd username
+						默认会建立用户家目录，且权限为 700,系统已经帮我们规定好非常多的默认值，一般仅使用以上例子添加用户即可:
+							在/etc/passwd 里面建立一行与账号相关的数据，包括建立UID/GID/家目录等；
+							在/etc/shadow 里面将此账号的密码相关参数填入，但是尚未有密码；还需要使用passwd username 来给予密码完成用户建立
+							在/etc/group 里面加入一个与账号名称一模一样的组名；
+							在/home 底下建立一个与账号同名的目录作为用户家目录，且权限为700
+				假设系统当中有个组名为 users ，且 UID 1500 并不存在，以users 为初始群组，uid为1500建立一个账号：
+					$ useradd -u 1500 -g users username
+				建立一个系统账号：
+					$ useradd -r username
+						默认情况：
+							系统账号默认都不会主动建立家目录
+							将账号与账号同名群组的UID/GID 都指定小于1000 以下
+			3-useradd创建用户时，涉及改动的文件
+				用户账号与密码参数方面的文件：/etc/passwd, /etc/shadow
+				使用者群组相关方面的文件：/etc/group, /etc/gshadow
+				用户的家目录：/home/账号名称
+			4-useradd默认值来源：
+				1)$ useradd -D          #数据其实来自/etc/default/useradd
+					GROUP=100	#预设的群组
+					HOME=/home	#默认的家目录所在目录
+					INACTIVE=-1	#密码失效日，在 shadow 内的第 7 栏
+					EXPIRE=		#账号失效日，在 shadow 内的第 8 栏
+					SHELL=/bin/bash		#预设的 shell
+					SKEL=/etc/skel		#用户家目录的内容数据参考目录
+					CREATE_MAIL_SPOOL=yes	#是否主动帮使用者建立邮件信箱(mailbox)
+				2)/etc/default/useradd
+					GROUP=100：新建账号的初始群组GID为100
+						GID为100者即是users这个群组,但是CentOS上面并不是这样，预设的群组为与账号名相同的群组。这是因为针对群组的角度有两种不同的机制所致，这两种机制分别是：
+							a-私有群组机制:
+								系统会建立一个与账号一样的群组给使用者作为初始群组。 这种群组的设定机制会比较有保密性，这是因为使用者都有自己的群组，而且家目录权限将会设定为700 (仅有自己可进入自己的家目录)之故。使用这种机制将不会参考GROUP=100 这个设定值。代表性的distributions 有RHEL,Fedora, CentOS 等
+							b-公共群组机制：
+								就是以GROUP=100 这个设定值作为新建账号的初始群组，因此每个账号都属于users 这个群组，且默认家目录通常的权限会是『drwxr-xr-x ... username users ... 』，由于每个账号都属于users 群组，因此大家都可以互相分享家目录内的数据之故。代表distributions 如SuSE 等。
+					HOME=/home：用户家目录的基准目录(basedir)
+					INACTIVE=-1：密码过期后是否会失效的设定值
+						shadow文件第七个字段的设定值会影响到密码过期后，在多久时间内还可使用旧密码登入。如果是0代表密码过期立刻失效，如果是-1 则是代表密码永远不会失效，如果是数字，如30，则代表过期30天后才失效。
+					EXPIRE=：账号失效的日期
+						shadow 内的第八字段，直接设定账号在哪个日期后就直接失效，而不理会密码的问题。通常不会设定，但如果是付费的会员制系统，或许这个字段可以设定！
+					SHELL=/bin/bash：默认使用的shell 程序文件名
+						不许用户登入系统取得 shell ，那么可以将这里设定为/sbin/nologin
+					SKEL=/etc/skel：用户家目录参考基准目录
+						指定用户家目录的参考基准目录,家目录/home/user内的各项数据，都是由/etc/skel 所复制过去的
+					CREATE_MAIL_SPOOL=yes：建立使用者的mailbox
+						你可以使用ll /var/spool/mail/user,会发现有这个文件的存在.这是使用者的邮件信箱！
+				3)除了这些基本的账号设定值之外， UID/GID 还有密码参数要看一下/etc/login.defs这个文件
+					MAIL_DIR /var/spool/mail          #用户默认邮件信箱放置目录
+					PASS_MAX_DAYS 99999          #/etc/shadow 内的第 5 栏，多久需变更密码日数
+					PASS_MIN_DAYS 0          #/etc/shadow 内的第 4 栏，多久不可重新设定密码日数
+					PASS_MIN_LEN 5          #密码最短的字符长度，已被 pam 模块取代，失去效用！
+					PASS_WARN_AGE 7          #/etc/shadow 内的第 6 栏，过期前会警告的日数
+					UID_MIN 1000          #使用者最小的 UID，意即小于 1000 的 UID 为系统保留
+					UID_MAX 60000          #使用者能够用的最大 UID
+					SYS_UID_MIN 201          #保留给用户自行设定的系统账号最小值 UID
+					SYS_UID_MAX 999          #保留给用户自行设定的系统账号最大值 UID
+					GID_MIN 1000          #使用者自定义组的最小 GID，小于 1000 为系统保留
+					GID_MAX 60000          #使用者自定义组的最大 GID
+					SYS_GID_MIN 201          #保留给用户自行设定的系统账号最小值 GID
+					SYS_GID_MAX 999          #保留给用户自行设定的系统账号最大值 GID
+					CREATE_HOME yes          #在不加 -M 及 -m 时，是否主动建立用户家目录？
+					UMASK 077          #用户家目录建立的 umask ，因此权限会是 700
+					USERGROUPS_ENAB yes          #使用 userdel 删除时，是否会删除初始群组
+					ENCRYPT_METHOD SHA512          #密码加密的机制使用的是 sha512 这一个机制！
+					总结主要有以下几个方面：
+						mailbox 所在目录
+ 						shadow 密码第4, 5, 6 字段内容：
+							透过 PASS_MAX_DAYS 等等设定值来指定的。所以预设的/etc/shadow 内每一行都会有0:99999:7。不过要注意的是，由于目前登入时改用PAM 模块来进行密码检验，所以那个PASS_MIN_LEN是失效的。
+ 						UID/GID 指定数值：
+							虽然 Linux 核心支持的账号可高达232 这么多个，不过一部主机要作出这么多账号在管理上也是很麻烦的！所以在这里就针对UID/GID 的范围进行规范就是了。上表中的UID_MIN 指的就是可登入系统的一般账号的最小UID ，至于UID_MAX 则是最大UID 之意。
+							要注意的是，系统给予一个账号UID 时：
+								(1)先参考UID_MIN 设定值取得最小数值； 
+								(2)由/etc/passwd 搜寻最大的UID 数值， 将 (1) 与(2) 相比，找出最大的那个再加一就是新账号的UID 了。
+ 						用户家目录设定值：
+							CREATE_HOME = yes设定会让在使用useradd 时， 主动加入-m这个产生家目录的选项！如果不想要建立用户家目录，就只能强制加上-M的选项！透过umask设定用户家目录默认权限
+ 						用户删除与密码设定值：
+							使用USERGROUPS_ENAB yes这个设定如果使用userdel去删除一个账号，且该账号所属的初始群组已经没有人隶属于该群组了，那么就删除掉该群组。ENCRYPT_METHOD SHA512』则表示使用SHA512 来加密密码明文，而不使用旧式的MD5。
+			5-useradd创建用户时，参考的文件：
+				/etc/default/useradd
+				/etc/login.defs
+				/etc/skel/*
+		2. 使用 useradd 建立了账号之后，在预设的情况下，该账号是暂时被封锁的，该账号是无法登入的,原因可以去查看/etc/shadow 内的第二个字段
+			passwd [--stdin] [账号名称]		#所有人均可使用来改自己的密码	
+			passwd [-l] [-u] [--stdin] [-S] [-n 日数] [-x 日数] [-w 日数] [-i 日期] 账号  	#root的功能
+			1-选项与参数：
+
+
+
+
+
+
+
