@@ -1,0 +1,41 @@
+1、账号管理实例
+	账号管理不是随意建置几个账号，有时候我们需要考虑到一部主机上面可能有多个账号在协同工作
+	1）使用者pro1, pro2, pro3是同一个项目计划的开发人员，我想要让这三个用户在同一个目录底下工作， 但这三个用户还是拥有自己的家目录与基本的私有群组。假设我要让这个项目计划在/srv/projecta目录下开发，可以如何进行？
+		1. 假设这三个账号都尚未建立，可先建立一个名为projecta的群组，再让这三个用户加入其次要群组的支持即可
+			$ groupadd projecta
+			$ useradd -G projecta -c "projecta user" pro1
+			$ useradd -G projecta -c "projecta user" pro2
+			$ useradd -G projecta -c "projecta user" pro3
+			$ echo "password" | passwd --stdin pro1
+			$ echo "password" | passwd --stdin pro2
+			$ echo "password" | passwd --stdin pro3
+		2. 开始建立此项目的开发目录
+			$ mkdir /srv/projecta
+			$ chgrp projecta /srv/projecta
+			$ chmod 2770 /srv/projecta
+			$ ll -d /srv/projecta
+2、假如myuser1是projecta 这个项目的助理，他需要读这个项目的内容，但是他『不可以修改』项目目录内的任何数据
+	1）将myuser1 加入projecta 这个群组的支持，但是这样会让myuser1 具有完整的/srv/projecta 的权限，myuser1 是可以删除该目录下的任何数据的！这样是有问题的
+	2）将/srv/projecta 的权限改为2775 ，让myuser1 可以进入查阅数据。但此时会发生所有其他人均可进入该目录查阅的困扰！ 这也不是我们要的环境
+	3）传统的 Linux 权限可以针对某个个人设定专属的权限，及ACL
+3、主机的细部权限规划：ACL 的使用
+	我们就一直强调Linux 的权限概念非常重要。但是传统的权限仅有三种身份(owner, group, others) 搭配三种权限(r,w,x) 而已，并没有办法单纯的针对某一个使用者或某一个群组来设定特定的权限需求，2中的需求，此时就得要使用 ACL机制。
+	1）什么是ACL
+		ACL 是Access Control List 的缩写，主要的目的是在提供传统的owner,group,others 的read,write,execute 权限之外的细部权限设定。ACL 可以针对单一使用者，单一文件或目录来进行r,w,x 的权限规范，对于需要特殊权限的使用状况非常有帮助。
+		主要可以针对几个项目：
+			使用者(user)：可以针对使用者来设定权限；
+			群组(group)：针对群组为对象来设定其权限；
+			默认属性(mask)：还可以针对在该目录下在建立新文件/目录时，规范新数据的默认权限；
+		也就是说，如果你有一个目录，需要给一堆人使用，每个人或每个群组所需要的权限并不相同时，传统的Linux 三种身份的三种权限是无法达到的，因为基本上，传统的 Linux 权限只能针对一个用户、一个群组及非此群组的其他人设定权限而已，无法针对单一用户或个人来设计权限。而ACL就是为了要改变这个问题。
+	2）如何启动ACL
+		事实上，原本ACL是unix-like操作系统的额外支持项目，但因为近年以来Linux 系统对权限细部设定的热切需求，因此目前ACL几乎已经预设加入在所有常见的Linux 文件系统的挂载参数中(ext2/ext3/ext4/xfs 等等)！所以你无须进行任何动作，不过，如果你不放心系统是否真的有支持ACL 的话，那么就来检查一下核心挂载时显示的信息
+			$ dmesg | grep -i acl
+	3）ACL 的设定技巧
+		1. setfacl [-bkRd] [{-m|-x} acl 参数] 目标文件名
+			1-选项与参数：
+				-m ：设定后续的 acl 参数给文件使用，不可与 -x 合用；
+				-x ：删除后续的 acl 参数，不可与 -m 合用；
+				-b ：移除『所有的』 ACL 设定参数；
+				-k ：移除『预设的』 ACL 参数，关于所谓的『预设』参数于后续范例中介绍；
+				-R ：递归设定 acl ，亦即包括次目录都会被设定起来；
+				-d ：设定『预设 acl 参数』的意思！只对目录有效，在该目录新建的数据会引用此默认值

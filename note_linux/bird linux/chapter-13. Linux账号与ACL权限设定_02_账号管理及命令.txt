@@ -231,6 +231,52 @@
 					$ chsh -s /bin/csh; grep username /etc/passwd
 		5. 不论是chfn与chsh，都是能够让一般用户修改/etc/passwd 这个系统文件的！所以这两个文件的权限一定是SUID的功能
 2、新增与移除群组
+	1）群组的内容都与这两个文件有关/etc/group,/etc/gshadow。群组的内容其实很简单，都是上面两个文件的新增、修改与移除而已。
+		1. groupadd [-g gid] [-r] 组名
+			1-选项与参数：
+				-g ：后面接某个特定的 GID ，用来直接给予某个GID
+				-r ：建立系统群组。与/etc/login.defs内的 GID_MIN有关。
+			2-eg:
+				新建一个群组
+					$ groupadd group1
+					$ grep group1 /etc/group /etc/gshadow
+		2. groupmod [-g gid] [-n group_name] 群组名
+			1-选项与参数：
+				-g ：修改既有的 GID 数字；
+				-n ：修改既有的组名
+			2-eg：
+				将刚刚上个指令建立的 group1 名称改为mygroup，GID为201
+					$ groupmod -g 201 -n mygroup group1
+					$ grep mygroup /etc/group /etc/gshadow
+			3-注意事项：
+				不要随意的更动GID容易造成系统资源错乱
+		3. groupdel [groupname]
+			1-注意事项：
+				有某个账号(/etc/passwd) 的initial group 使用该群组。则无法删除，必须要确认/etc/passwd内的账号没有任何人使用该群组作为initial group才行。
+		4. 如果系统管理员太忙碌，某些账号想要加入某个项目时可以建立『群组管理员，就是让某个群组具有一个管理员，这个群组管理员可以管理哪些账号可以加入/移出该群组
+			1-关于系统管理员(root)做的动作：
+				gpasswd groupname
+				gpasswd [-A user1,...] [-M user3,...] groupname
+				gpasswd [-rR] groupname
+				选项与参数：
+					   ：若没有任何参数时，表示给予 groupname 一个密码(/etc/gshadow)
+					-A ：将 groupname 的主控权交由后面的使用者管理(该群组的管理员)
+					-M ：将某些账号加入这个群组当中！
+					-r ：将 groupname 的密码移除
+					-R ：让 groupname 的密码栏失效
+			2-关于群组管理员(Group administrator)做的动作：
+				gpasswd [-ad] user groupname
+				选项与参数：
+					-a ：将某位使用者加入到 groupname 这个群组当中！
+					-d ：将某位使用者移除出 groupname 这个群组当中。
+			3-eg：
+				建立一个新群组，名称为 testgroup 且群组交由 vbird1 管理
+					$ groupadd testgroup
+					$ gpasswd testgroup
+					$ gpasswd -A vbird1 testgroup
+					$ grep testgroup /etc/group /etc/gshadow
+		
+			
 
 
 
