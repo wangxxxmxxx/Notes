@@ -42,7 +42,7 @@
 			3. 若密码输入成功，便开始进行sudo 后续接的指令(但root 执行sudo 时，不需要输入密码)；
 			4. 若欲切换的身份与执行者身份相同，那也不需要输入密码。
 		所以sudo执行的重点是：能否使用sudo必须要看/etc/sudoers 的设定值，而可使用sudo者是透过输入用户自己的密码来执行后续的指令串！由于能否使用与/etc/sudoers 有关，该文件的内容是有一定的规范的，因此直接使用vi去编辑是不好的。此时，得透过visudo去修改这个文件
-	4-visudo 与/etc/sudoers
+	4-visudo与/etc/sudoers
 		除了root 之外的其他账号，若想要使用sudo执行属于root的权限指令，则root需要先使用visudo去修改/etc/sudoers，让该账号能够使用全部或部分的root 指令功能。为什么使用visudo？这是因为/etc/sudoers是有设定语法的，如果设定错误那会造成无法使用sudo 指令的不良后果。因此才会使用visudo 去修改， 并在结束离开修改画面时，系统会去检验/etc/sudoers的语法。visudo 的设定方式有几种简单的方法：
 		1）单一用户可进行root 所有指令，与sudoers 文件语法：
 			使用者账号 登入者的来源主机名=(可切换的身份) 可下达的指令
@@ -68,10 +68,16 @@
 					$ sudo passwd  #执行才语句会造成该root密码的情况
 			2_myuser1 ALL=(root) !/usr/bin/passwd, /usr/bin/passwd [A-Za-z]*, !/usr/bin/passwd root
 				不可执行passwd与passwd root这两个指令
-			
-		
-		
-		
-		
-		
-	
+		5）透过别名建置visudo：
+			有15个用户需要加入刚刚的管理员行列不需要罗列15行
+				User_Alias ADMPW = pro1, pro2, pro3, myuser1, myuser2
+				Cmnd_Alias ADMPWCOM = !/usr/bin/passwd, /usr/bin/passwd [A-Za-z]*, !/usr/bin/passwd root
+				ADMPW ALL=(root) ADMPWCOM
+				User_Alias建立出一个新账号，这个账号名称一定要使用大写字符来处理，包括Cmnd_Alias(命令别名)、Host_Alias(来源主机名别名) 都需要使用大写字符。这个ADMPW代表后面接的那些实际账号。而该账号能够进行的指令就如同ADMPWCOM后面所指定的那样！上表最后一行则写入这两个别名(账号与指令别名)，未来要修改时，修改 User_Alias以及Cmnd_Alias这两行即可。
+		6）sudo 的时间间隔问题：
+			如果使用同一个账号在短时间内重复操作sudo来运作指令的话，在第二次执行sudo时，并不需要输入自己的密码！sudo还是会正确的运作。两次执行 sudo 的间隔在五分钟内，那么再次执行sudo 时就不需要再次输入密码，系统相信你在五分钟内不会离开，所以执行sudo的是同一个人。
+		7）sudo 搭配su 的使用方式：
+			很多时候我们需要大量执行很多root 的工作，有没有办法使用sudo搭配su，一口气将身份转为root，而且还用用户自己的密码来变成root，建立一个ADMINS 帐户别名，然后这样做：
+				User_Alias ADMINS = user1, user2, user3
+				ADMINS ALL=(root) /bin/su -
+			只要输入sudo su -并且输入自己的密码后，立刻变成 root 的身份。不但root 密码不会外流，这也是实务上面多人共管一部主机时常常使用的技巧。这样管理确实方便，不过还是要强调一下大前提， 那就是你加入的使用者，全部都是你能够信任的用户！！！！！！！
