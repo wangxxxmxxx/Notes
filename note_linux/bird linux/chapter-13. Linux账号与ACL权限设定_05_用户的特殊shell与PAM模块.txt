@@ -67,5 +67,25 @@
 		9-pam_limits.so：
 			第十章谈到的ulimit，就是这个模块提供的能力！还有更多细部的设定可以参考：/etc/security/limits.conf 内的说明。
 6、了解了这些模块的大致功能后，讨论一下 login 的PAM 验证机制流程：
+	1. 验证阶段(auth)：首先，(a)会先经过pam_securetty.so 判断，如果使用者是root 时，则会参考/etc/securetty的设定； 接下来(b)经过pam_env.so 设定额外的环境变量；再(c)透过pam_unix.so 检验密码，若通过则回报login 程序；若不通过则(d)继续往下以pam_succeed_if.so 判断UID 是否大于1000 ，若小于1000 则回报失败，否则再往下(e)以pam_deny.so 拒绝联机。
+	2. 授权阶段(account)：(a)先以pam_nologin.so 判断/etc/nologin 是否存在，若存在则不许一般使用者登入；(b)接下来以pam_unix.so 及pam_localuser.so 进行账号管理，再以(c) pam_succeed_if.so 判断UID 是否小于1000 ，若小于1000 则不记录登录信息。(d)最后以pam_permit.so 允许该账号登入。
+	3. 密码阶段(password)：(a)先以pam_pwquality.so 设定密码仅能尝试错误3 次；(b)接下来以pam_unix.so 透过sha512, shadow等功能进行密码检验，若通过则回报login 程序，若不通过则(c)以pam_deny.so 拒绝登入。
+	4. 会议阶段(session)：(a)先以pam_selinux.so 暂时关闭SELinux；(b)使用pam_limits.so 设定好用户能够操作的系统资源； (c)登入成功后开始记录相关信息在登录文件中； (d)以pam_loginuid.so 规范不同的UID权限；(e)开启pam_selinux.so 的功能。
+	总之，就是依据验证类别 (type) 来看，然后先由login 的设定值去查阅，如果出现『includesystem-auth 』就转到 system-auth 文件中的相同类别，去取得额外的验证流程就是了。然后再到下一个验证类别，最终将所有的验证跑完！就结束这次的 PAM 验证！
+7、为什么 root 无法以 telnet 直接登入系统，但是却能够使用 ssh 直接登入？
+	一般来说， telnet 会引用 login 的 PAM 模块，而 login 的验证阶段会有 /etc/securetty 的限制！ 由于远程联机属于 pts/n (n 为数字) 的动态终端机接口装置名称，并没有写入到 /etc/securetty，因此root无法以telnet登入远程主机。至于ssh使用的是/etc/pam.d/sshd这个模块， 你可以查阅一下该模块，由于该模块的验证阶段并没有加入pam_securetty，因此就没有/etc/securetty 的限制！故可以从远程直接联机到服务器端。
+8、其他相关文件：
+	除了前面谈到的/etc/securetty会影响到root可登入的安全终端机，/etc/nologin会影响到一般使用者是否能够登入的功能之外，我们也知道PAM 相关的配置文件在/etc/pam.d ， 说明文件在/usr/share/doc/pam-(版本) ，模块实际在/lib64/security/ 。其他相关的PAM 文件，主要都在/etc/security 这个目录内！底下介绍几个可能会用到的配置文件:
+	1）limits.conf
+		第十章谈到的ulimit功能中，除了修改使用者的~/.bashrc 配置文件之外，其实系统管理员可以统一藉由PAM来管理的！那就是 /etc/security/limits.conf 这个文件的设定了。这个文件的设定很简单，自行参考一下该文件内容。这里仅作个简单的介绍：
+			#账号 限制依据 限制项目 限制值
+			# 第一字段为账号，或者是群组！若为群组则前面需要加上 @ ，例如 @projecta
+			# 第二字段为限制的依据，是严格(hard)，还是仅为警告(soft)；
+			# 第三字段为相关限制，此例中限制文件容量，
+			# 第四字段为限制的值，在此例中单位为 KB。
+			# 若以 vbird1 登入后，进行如下的操作则会有相关的限制出现！
+		这个文件设定完成就生效，你不用重新启动任何服务！但是PAM有个特殊的地方，由于他是在程序呼叫时才予以设定的，因此你修改完成的数据，对于已登入系统中的用户是没有效果的，要等他再次登入时才会生效喔！
+	2）/var/log/secure, /var/log/messages
+		如果发生任何无法登入或者是产生一些你无法预期的错误时，由于 PAM 模块都会将数据记载在/var/log/secure 当中，所以发生了问题请务必到该文件内去查询一下问题点！
 	
 				
