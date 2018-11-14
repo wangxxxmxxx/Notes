@@ -1,2 +1,27 @@
 1、查询使用者： w, who, last, lastlog
-	
+	id, finger等指令查询一个用户的相关数据，那么想要知道使用者到底啥时候登入呢？ 最简单可以使用last检查，在第十章bash提过。早期的Red Hat系统的版本中，last 仅会列出当月的登入者信息，不过在我们的CentOS5.x版以后，last可以列出从系统建立之后到目前为止的所有登入者信息！这是因为登录档轮替的设定不同所致。详细的说明可以参考后续的第十八章登录档简介。
+	如果想要知道目前已登入在系统上面的用户，透过 w 或who 来查询
+	1） $ w
+			# 第一行显示目前的时间、开机 (up) 多久，几个用户在系统上平均负载等；
+			# 第二行只是各个项目的说明，
+			# 第三行以后，每行代表一个使用者。
+	2） $ who
+	3） $ lastlog
+			要知道每个账号的最近登入的时间，使用lastlog.lastlog会去读取/var/log/lastlog文件。
+2、使用者对谈： write, mesg, wall
+	write 可以直接将讯息传给接收者。
+	1）write 使用者账号 [用户所在终端接口]
+		$ who
+		$ write user1 pts/2
+			然后就可以输入信息，ctrl-d结束，user1界面就会立刻显示信息
+		如果当时user1正在查资料。user1不想要接受任何讯息,user1可以执行：
+		$ mesg n  #n/y
+		$ mesg    #查看状态
+			mesg 的功能对root传送来的讯息没有抵挡的能力。所以如果是root传送讯息，user1还是得要收下。
+	2）相对于write是仅针对一个使用者，还可以『对所有系统上面的用户传送简讯(广播)。用wall 即可
+		$ wall "I will shutdown my linux server..."
+3、使用者邮件信箱： mail
+	使用wall,write要等到使用者在线才能够进行，每个Linux主机上面的用户都具有一个mailbox。我们可以寄、收mailbox内的信件呢！一般来说，mailbox都会放置在/var/spool/mail里面，一个账号一个mailbox(文件)。举例来说，user1就具有/var/spool/mail/user1这个mailbox。直接使用mail即可发邮件。这个指令的用法很简单的，直接这样下达：mail -s "邮件标题" username@localhost即可！ 一般来说，如果是寄给本机上的使用者，基本上，@localhost都不用写。举例来说，我以root 寄信给user1，信件标题是『nice to meet you 』，则：
+		$ mail -s "nice to meet you" user1
+			#输入内容
+			#最后一行输入.(一个点)结束
