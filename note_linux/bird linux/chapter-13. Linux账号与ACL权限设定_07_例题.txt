@@ -1,0 +1,9 @@
+1、root的UID与GID是多少？而基于这个理由，让test这个账号具有root权限，应该怎么作？
+	root的UID与GID均为0，让test变成root的权限，那么就将/etc/passwd里面，test的UID与GID字段变成0即可！
+2、系统管理员，暂时将账号停掉？
+	由于这个账号是暂时失效，所以不能使用 userdel来删除，否则很麻烦，可以知道有这几个可使用的方法：
+	将/etc/passwd的 shell 字段写成/sbin/nologin，即可让该账号暂时无法登入主机；
+	将/etc/shadow内的密码字段，增加一个*号在最前面，这样该账号亦无法登入！
+	将/etc/shadow的第八个字段关于账号取消日期的那个，设定小于目前日期的数字，那么他就无法登入系统了。
+3、由于种种因素，导致你的用户家目录以后都需要被放置到/account 这个目录下。请问，我该如何作，可以让使用useradd 时，默认的家目录就指向/account？
+	最简单的方法，编辑 /etc/default/useradd ，将里头的 HOME=/home 改成 HOME=/account 即可。
