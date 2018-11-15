@@ -1,0 +1,204 @@
+1、什么是daemon与服务(service)
+	1）服务是『常驻在记体体中的程序，且可以提供一些系统或网路功能，那就是服务』。服务一般的英文说法是『 service 』。
+	但如果你常常上网去查看一些数据的话，尤其是 Unix-Like 的相关操作系统，应该常常看到『请启动某某daemon 来提供某某功能』，那么daemon 与service 有关啰？否则为什么都能够提供某些系统或网络功能？此外，这个daemon是什么东西呀？daemon的字面上的意思就是『守护神、恶魔？』还真是有点奇怪。简单的说，系统为了某些功能必须要提供一些服务(不论是系统本身还是网络方面)，这个服务就称为service 。但是 service 的提供总是需要程序的运作吧！否则如何执行呢？所以达成这个service的程序我们就称呼他为daemon。举例来说，达成循环型例行性工作排程服务(service) 的程序为crond 这个daemon。
+	2）不必去区分什么是daemon与service！事实上，你可以将这两者视为相同！因为达成某个服务是需要一支daemon在背景中运作，没有这支daemon就不会有service！所以不需要分的太清楚啦！一般来说，当我们以文本模式或图形模式 (非单人维护模式) 完整开机进入Linux 主机后，系统已经提供我们很多的服务了！包括打印服务、工作排程服务、邮件管理服务等等。
+	3）daemon既然是一只程序执行后的程序，那么daemon 所处的那个原本的程序通常是如何命名的呢(daemon程序的命名方式)。每一个服务的开发者，当初在开发他们的服务时，都有特别的故事！不过，无论如何，这些服务的名称被建立之后，被挂上Linux使用时，通常在服务的名称之后会加上一个d，例如例行性命令的建立的at,与cron这两个服务，他的程序文件名会被取为atd与crond，这个d代表的就是daemon 的意思。所以，在第十六章中，我们使用了ps 与top 来观察程序时，都会发现到很多的{xxx}d 的程序。
+2、早期System V的init 管理行为中daemon 的主要分类(Optional)
+	第一章谈到过Unix的systemV版本？那个很纯种的Unix版本～在那种年代底下，启动系统服务的管理方式被称为SysV的init脚本程序的处理方式！亦即系统核心第一支呼叫的程序是init，然后init去唤起所有的系统所需要的服务，不论是本地服务还是网络服务就是了。
+	1）daemon 的主要分类
+		如果依据daemon 的启动与管理方式来区分，基本上，可以将daemon分为可独立启动的stand alone，与透过一支super daemon来统一管理的服务这两大类，这两类daemon 的说明如下：
+		1-stand_alone：此daemon 可以自行单独启动服务
+			就字面上的意思来说，stand alone就是『独立的启动』的意思。这种类型的daemon可以自行启动而不必透过其他机制的管理， daemon启动并载入到记忆体后就一直占用记忆体与系统资源。最大的优点就是：因为是一直存在记忆体内持续的提供服务，因此对于发生用户端的要求时，stand alone的daemon回应速度较快。常见的stand alone daemon有WWW的daemon (httpd)、FTP的daemon (vsftpd)等等。
+		2-super daemon： 一支特殊的daemon 来统一管理
+			这一种服务的启动方式则是藉由一个统一的daemon来负责唤起服务！这个特殊的daemon就被称为super daemon 。早期的super daemon是inetd这一个，后来则被xinetd所取代了。这种机制比较有趣的地方在于， 当没有用户端的要求时，各项服务都是未启动的情况，等到有来自用户端的要求时， super daemon才唤醒相对应的服务。当用户端的要求结束后，被唤醒的这个服务也会关闭并释放系统资源。
+			这种机制的好处是： (1)由于super daemon负责唤醒各项服务，因此super daemon可以具有安全控管的机制，就是类似网路防火墙的功能啦！ (2)由于服务在用户端的连线结束后就关闭，因此不会一直占用系统资源。但是缺点是什么呢？因为有用户端的连线才会唤醒该服务，而该服务载入到记忆体的时间需要考虑进去，因此服务的反应时间会比较慢一些啦！常见的super daemon所管理的服务例如telnet
+		3-窗口类型的解说：
+			那么这两种启动的方式哪一个比较好？见仁见智啦！而且还要看该主机的工作负荷与实际的用途！例如当你的主机是用来作为WWW伺服器的，那么httpd自然就以stand alone的启动方式较佳！说明 stand alone 与super daemon 的情况，可以银行的窗口来作为说明的范例
+			1-个别窗口负责单一服务的stand alone：
+				在银行里面，假设有一种单一服务的窗口，例如存钱窗口，所以当你需要存钱的时候，直接前往该窗口，就有『专人』为你服务啦！这就是sta	nd alone的情况。
+			2-统一窗口负责各种业务的super daemon：
+				在银行里面假设还有另外一种复合型态的统一窗口，同时提供转帐、资金调度、提款等等的业务，那当你需要其中一项业务的时候，就需要前往该窗口。但是坐在窗口的这个营业员，拿到你的需求单之后，往后面一丢『喂！那个转帐的仁兄！该你的工作了』那么那个仁兄就开始工作去！然而里头还有资金调度与提款等负责业务的仁兄呢？他们在看看报、喝喝茶！
+				那么这里就会引出另外一个问题啦！假设银行今天的人潮特别的汹涌，所以这个窗口后面除了你之外还有很多的人！那么想一想，这个窗口是要『一个完成再来下一个』还是『全部都把你们的单据拿来，我全部处理掉』呢？呵呵！是不是不太一样？基本上，针对这种super daemon的处理模式有两种，分别是这样：
+					multi-threaded (多重执行绪)：
+						就是我们提到的，全部的客户之要求都给他拿来，一次给他交办下去，所以一个服务同时会负责好几个程序。
+					single-threaded (单一执行绪)：
+						这个就是目前我们『人类的银行』最常见的方式啦，不论如何，反正一个一个来，第一个没有处理完之前，后面的请排队！所以如果client的要求突然大增的话，那么这些晚到的client可得等上一等！
+		4-daemon 工作形态的类型
+			如果以daemon 提供服务的的工作状态来区分，又可以将daemon分为两大类，分别是：
+			signal-control
+				这种daemon是透过讯号来管理的，只要有任何用户端的需求进来，他就会立即启动去处理！例如印表机的服务(cupsd)。 
+			interval-control
+				这种daemon则主要是『每隔一段时间就主动的去执行某项工作』，所以，你要作的是在设定档指定服务要进行的时间与工作，该服务在指定的时间才会去完成工作。我们在第十六章提到的atd与crond就属于这种类型的daemon啦(每分钟侦测一次设定档)
+				另外，如果你对于开发程式很有兴趣的话，那么可以自行查阅一下『 man 3 daemon 』看看系统对于daemon 的详细说明。
+		5-daemon 的命名规则
+			每一个服务的开发者，当初在开发他们的服务时，都有特别的故事！不过，无论如何，这些服务的名称被建立之后，被挂上Linux使用时，通常在服务的名称之后会加上一个d，例如例行性命令的建立的at,与cron这两个服务，他的程序文件名会被取为atd与crond，这个d代表的就是daemon 的意思。所以，在第十六章中，我们使用了ps 与top 来观察程序时，都会发现到很多的{xxx}d 的程序。
+	2）服务与埠口的对应
+		系统上面设定服务与埠号对应在一起文件为/etc/services
+	3）daemon 的启动脚本与启动方式
+		提供某个服务的daemon 虽然只是一支程式而已，但是这支daemon 的启动还是需要执行档、设定档、执行环境等等， 举例来说，你可以查阅一下httpd 这个程式(man httpd) ，里面可谈到不少的选项与参数呢！此外，为了管理上面的方便， 所以通常distribution 都会记录每一支daemon 启动后所取得程序的PID 在/var/run/ 这个目录下呢！还有还有，在启动这些服务之前，你可能也要自行处理一下daemon 能够顺利执行的环境是否正确等等。要启动一支daemon 考虑的事情很多，并非单纯执行一支程式就够了。
+		为了解决上面谈到的问题，因此通常distribution会给我们一个简单的shell script来进行启动的功能。该script可以进行环境的侦测、设定档的分析、PID档案的放置，以及相关重要交换档案的锁住(lock)动作，你只要执行该script ，上述的动作就一口气连续的进行，最终就能够顺利且简单的启动这个daemon。
+		1-那么这些daemon 的启动脚本(shell script) 放在哪里？还有， CentOS 5.x 通常将daemon 相关的档案放在哪里？以及某些重要的设定档又是放置到哪里？基本上是放在这些地方：
+			/etc/init.d/* ：启动脚本放置处
+				统上几乎所有的服务启动脚本都放置在这里！事实上这是公认的目录，我们的CentOS实际上放置在/etc/rc.d/init.d/啦！不过还是有设定连结档到/etc/init.d/的！既然这是公认的目录，因此建议您记忆这个目录即可！
+			/etc/sysconfig/* ：各服务的初始化环境设定档
+				几乎所有的服务都会将初始化的一些选项设定写入到这个目录下，举例来说，登录档的syslog这支daemon的初始化设定就写入在/etc/sysconfig/syslog这里呢！而网路的设定则写在/etc/sysconfig/network这个档案中。所以，这个目录内的档案也是挺重要的；
+			/etc/xinetd.conf, /etc/xinetd.d/* ：super daemon设定档
+				super daemon的主要设定档(其实是预设值)为/etc/xinetd.conf ，不过我们上面就谈到了， super daemon只是一个统一管理的机制，他所管理的其他daemon的设定则写在/etc/xinetd.d/*里头喔！
+			/etc/* ：各服务各自的设定档
+				第六章就讲过了，大家的设定档都是放置在/etc/底下的喔！
+			/var/lib/* ：各服务产生的资料库
+				一些会产生资料的服务都会将他的资料写入到/var/lib/目录中。举例来说，资料库管理系统MySQL的资料库预设就是写入/var/lib/mysql/这个目录下啦！
+			/var/run/* ：各服务的程序之PID记录处
+				之前谈到可以使用讯号(signal)来管理程序，既然daemon是程序，所以当然也可以利用kill或killall来管理啦！不过为了担心管理时影响到其他的程序，因此daemon通常会将自己的PID记录一份到/var/run/当中！例如登录档的PID就记录在/var/run/syslogd.pid这个档案中。如此一来， /etc/init.d/syslog就能够简单的管理自己的程序啰。
+		2-上面谈到的部分是设定档，那么stand alone 与super daemon 所管理的服务启动方式怎么做：
+			1/Stand alone 的/etc/init.d/* 启动
+				刚刚谈到了几乎系统上面所有服务的启动脚本都在/etc/init.d/底下，这里面的脚本会去侦测环境、搜寻设定档、载入distribution提供的函数功能、判断环境是否可以运作此daemon等等，等到一切都侦测完毕且确定可以运作后，再以shell script的case....esac语法来启动、关闭、观察此daemon！我们可以简单的以/etc/init.d/syslog这个登录档启动脚本来进行说明：
+					eg:
+						$ /etc/init.d/syslog
+							用法: /etc/init.d/syslog {start|stop|status|restart|condrestart}
+							# 什么参数都不加的时候，系统会告诉你可以用的参数有哪些。
+						$ /etc/init.d/syslog status
+							syslogd (pid 4264) 正在执行...
+							klogd (pid 4267) 正在执行...
+							# 代表syslog 管理两个daemon ，这两个daemon 正在运作中！
+						$ /etc/init.d/syslog restart
+							正在关闭核心记录器: [ 确定 ]
+							正在关闭系统记录器: [ 确定 ]
+							正在启动系统记录器: [ 确定 ]
+							正在启动核心记录器: [ 确定 ]
+						$ /etc/init.d/syslog status
+							syslogd (pid 4793) 正在执行...
+							klogd (pid 4796) 正在执行...
+							# 因为重新启动过，所以PID 与第一次观察的值就不一样了
+				由于系统的环境都已经帮你制作妥当，所以利用/etc/init.d/*来启动、关闭与观察，就非常的简单！话虽如此， CentOS还是有提供另外一支可以启动stand alone 服务的脚本喔，那就是service这个程式。其实service仅是一支script 啦,他可以分析你下达的service 后面的参数，然后根据你的参数再到/etc/init.d/去取得正确的服务来start 或stop ！他的语法是这样的啦：
+					service [service name] (start|stop|restart|...) 
+					service --status-all 
+						选项与参数：
+						service name：亦即是需要启动的服务名称，需与/etc/init.d/ 对应；
+						start|... ：亦即是该服务要进行的工作。
+						--status-all：将系统所有的stand alone 的服务状态通通列出来
+					eg：
+						$ service crond restart 
+						$ /etc/init.d/crond restart
+							#两种方法随便你用哪一种来处理都可以
+			2/Super daemon 的启动方式
+				其实Super daemon本身也是一支stand alone的服务，因为super daemon要管理后续的其他服务，他当然自己要常驻在记忆体中！所以Super daemon自己启动的方式与stand alone是相同的！但是他所管理的其他daemon就不是这样做啰！必须要在设定档中设定为启动该daemon才行。设定档就是/etc/xinetd.d/*的所有档案。那如何得知super daemon所管理的服务是否有启动呢？你可以这样做：
+					$ grep -i 'disable' /etc/xinetd.d/* 
+						...(前面省略)....
+						/etc/xinetd.d/rsync: disable = yes
+						/etc/xinetd.d/tcpmux-server: disable = yes
+						/etc/xinetd.d/time-dgram: disable = yes
+						/etc/xinetd.d/time-stream: disable = yes
+				因为disable 是『取消』的意思，因此如果『 disable = yes 』则代表取消此项服务的启动，如果是『 disable = no 』 才是有启动该服务啦！假设我想要启动如上的rsync这个服务，那么你可以这样做：
+					#1.先修改设定档成为启动的模样： 
+					$ vim /etc/xinetd.d/rsync 
+					#将disable那一行改成如下的模样(原本是yes改成no就对了)
+					service rsync
+					{
+							disable = no 
+					....(后面省略)....
+
+					# 2.重新启动xinetd这个服务 
+					$ /etc/init.d/xinetd restart
+					正在停止xinetd: [ 确定 ]
+					正在启动xinetd: [ 确定 ]
+
+					# 3.观察启动的埠口 
+					$ grep 'rsync' /etc/services   <==先看看埠口是哪一号
+					rsync 873/tcp # rsync
+					rsync 873/udp # rsync
+					$ netstat -tnlp | grep 873 
+					tcp 0 0 0.0.0.0: 873       0.0.0.0:* LISTEN 4925/ xinetd 
+					#注意看！启动的服务并非rsync喔！而是xinetd ，因为他要控管rsync！
+				也就是说，你先修改/etc/xinetd.d/ 底下的设定档，然后再重新启动xinetd！xinetd 是一个stand alone启动的服务！这部份得要特别留意！
+	4）解析super daemon 的设定档
+		前一小节谈到的super daemon我们现在知道他是一支总管程序，这个super daemon是xinetd这一支程序所达成的。xinetd可以进行安全性或者是其他管理机制的控管，xinetd也能够控制连线的行为。这些控制的手段都可以让我们的某些服务更为安全，资源管理更为合理。而由于super daemon可以作这样的管理，因此一些对用户端开放较多权限的服务(例如telnet)，或者本身不具有管理机制或防火墙机制的服务，就可以透过xinetd来管理啊！
+		既然这么重要，那么底下我们就来谈谈xinetd 这个服务的预设设定档/etc/xinetd.conf ，以及各个设定项目的意义： 
+			$ vim /etc/xinetd.conf
+			defaults
+			{
+			#服务启动成功或失败，以及相关登入行为的记录档 
+					log_type = SYSLOG daemon info   <==登录档的记录服务类型 
+					log_on_failure = HOST    <==发生错误时需要记录的资讯为主机(HOST) 
+					log_on_success = PID HOST DURATION EXIT <==成功启动或登入时的记录资讯
+			#允许或限制连线的预设值 
+					cps = 50 10 <==同一秒内的最大连线数为50个，若超过则暂停10秒 
+					instances = 50     <==同一服务的最大同时连线数 
+					per_source = 10     <==同一来源的用户端的最大连线数
+			#网路(network)相关的预设值 
+					v6only = no <==是否仅允许IPv6 ？可以先暂时不启动IPv6支援！
+			#环境参数的设定
+					groups = yes
+					umask = 002
+			}
+
+			includedir /etc/xinetd.d <==更多的设定值在/etc/xinetd.d那个目录内
+		为什么/etc/xinetd.conf可以称为预设值的设定档呢？因为如果你有启动某个super daemon管理的服务，但是该服务的设定值并没有指定上述的那些项目，那么该服务的设定值就以上述的预设值为主！至于上述的预设值会将super daemon管理的服务设定为：『一个服务最多可以有50个同时连线，但每秒钟发起的「新」连线最多仅能有50条，若超过50条则该服务会暂停10秒钟。同一个来源的用户最多仅能达成10条连线。而登入的成功与失败所记录的资讯并不相同。』
+		既然这只是个预设参数档，那么自然有更多的服务参数档案啰～没错～而所有的服务参数档都在 /etc/xinetd.d 里面，这是因为上表当中的最后一行。每个参数档案的内容是怎样呢：
+			service <service_name>
+			{
+				   <attribute> <assign_op> <value> <value> ...
+				   .............
+			}
+		第一行一定都有个service ，至于那个<service_name>里面的内容，则与/etc/services 有关，因为他可以对照着/etc/services内的服务名称与埠号来决定所要启用的port是哪个啊！然后相关的参数就在两个大刮号中间。attribute是一些xinetd的管理参数， assign_op则是参数的设定方法。assign_op的主要设定形式为：
+			 = ：表示后面的设定参数就是这样啦！
+			+= ：表示后面的设定为『在原来的设定里头加入新的参数』
+			-= ：表示后面的设定为『在原来的参数舍弃这里输入的参数！』
+		attribute (功能)			说明与范例
+		一般设定项目：服务的识别、启动与程式
+		disable (启动与否)			设定值：[yes|no]，预设disable = yes
+									disable 为取消的意思，此值可设定该服务是否要启动。预设所有的super daemon 管理的服务都不启动的。若要启动就得要设定为『 disable = no 』
+		id (服务识别)				设定值：[服务的名称]
+									虽然服务在设定档开头『service服务名称』已经指定了，不过有时后会有重复的设定值，此时可以用id来取代服务名称。你可以参考一下/etc/xinetd.d/time-stream 来思考一下原理。
+		server (程式档名)			设定值：[program 的完整档名]
+									这个就是指出这个服务的启动程式！例如/usr/bin/rsync 为启动rsync 服务的指令，所以这个设定值就会成为： 『 server = /usr/bin/rsync 』
+		server_args (程式参数)		设定值：[程式相关的参数]
+									这里应该输入的就是你的server 那里需要输入的一些参数啦！例如rsync 需要加入--daemon ， 所以这里就设定：『 server_args = --daemon 』。与上面server 搭配，最终启动服务的方式『/usr/bin/rsync --daemon』
+		user (服务所属UID)			设定值：[使用者帐号]
+									如果xinetd 是以root 的身份启动来管理的，那么这个项目可以设定为其他使用者。此时这个daemon 将会以此设定值指定的身份来启动该服务的程序喔！举例来说，你启动rsync 时会以这个设定值作为该程序的UID。
+		group						跟user 的意思相同！此项目填入群组名称即可。
+		一般设定项目：连线方式与连线封包协定
+		socket_type (封包类型)		设定值：[stream|dgram|raw]，与封包有关
+									stream 为连线机制较为可靠的TCP 封包，若为UDP 封包则使用dgram 机制。raw 代表server 需要与IP 直接对谈！举例来说rsync 使用TCP ，故设定为『socket_type = stream 』
+		protocol (封包类型)			设定值：[tcp|udp]，通常使用socket_type 取代此设定
+									使用的网路通讯协定，需参考/etc/protocols 内的通讯协定，一般使用tcp 或udp。由于与socket_type 重复， 因此这个项目可以不指定。
+		wait (连线机制)				设定值：[yes(single)|no(multi)]，预设wait = no
+									这就是我们刚刚提到的Multi-threaded与single-threaded ！一般来说，我们希望大家的要求都可以同时被启用，所以可以设定『 wait = no 』此外，一般udp设定为yes而tcp设定为no。
+		instances (最大连线数)		设定值：[数字或UNLIMITED]
+									这个服务可接受的最大连线数量。如果你只想要开放30 个人连线rsync 时，可在设定档内加入：『 instances = 30 』
+		per_source (单一用户来源)	设定值：[一个数字或UNLIMITED]
+									如果想要控制每个来源IP 仅能有一个最大的同时连线数，就指定这个项目吧！例如同一个IP 最多只能连10 条连线『 per_source = 10 』
+		cps (新连线限制)			设定值：[两个数字]
+									为了避免短时间内大量的连线要求导致系统出现忙碌的状态而有这个cps 的设定值。第一个数字为一秒内能够接受的最多新连线要求， 第二个数字则为，若超过第一个数字那暂时关闭该服务的秒数。
+		一般设定项目：登录档的记录
+		log_type (登录档类型)		设定值：[登录项目等级]
+									当资料记录时，以什么登录项目记载？且需要记载的等级为何(预设为info等级)。这两个设定值得要看过下一章登录档后才会知道哩！这边你先有印象即可。
+		log_on_success 
+		log_on_failure (登录状态)	设定值：[PID,HOST,USERID,EXIT,DURATION]
+									在『成功登入』或『失败登入』之后，需要记录的项目：PID 为纪录该server 启动时候的process ID ， HOST 为远端主机的IP、USERID 为登入者的帐号、EXIT 为离开的时候记录的项目、DURATION 为该使用者使用此服务多久？
+		进阶设定项目：环境、网路埠口与连线机制等
+		env (额外变数设定)			设定值：[变数名称=变数内容]
+									这一个项目可以让你设定环境变量。
+		port (非正规埠号)			设定值：[一组数字(小于65534)]
+									这里可以设定不同的服务与对应的port ，但是请记住你的port 与服务名称必须与/etc/services 内记载的相同才行！不过，若服务名称是你自订的，那么这个port 就可以随你指定
+		redirect (服务转址)			设定值：[IP port]
+									将client 端对我们server 的要求，转到另一部主机上去！呵呵！这个好玩呦！例如当有人要使用你的ftp 时，你可以将他转到另一部机器上面去！那个IP_Address 就代表另一部远端主机的IP 啰！
+		includedir (呼叫外部设定)	设定值：[目录名称]
+									表示将某个目录底下的所有档案都给他塞进来xinetd.conf 这个设定里头！这东西有用多了， 如此一来我们可以一个一个设定不同的项目！而不需要将所有的服务都写在xinetd.conf 当中！你可以在/etc/xinetd.conf 发现这个设定呦！
+		安全控管项目：
+		bind (服务介面锁定)			设定值：[IP]
+									这个是设定『允许使用此一服务的介面卡』的意思！举个例子来说，你的Linux 主机上面有两个IP ，而你只想要让IP1 可以使用此一服务，但IP2 不能使用此服务，这里就可以将IP1 写入即可！那么IP2 就不可以使用此一server 啰
+		interface					设定值：[IP]
+									与bind 相同
+		only_from (防火墙机制)		设定值：[0.0.0.0, 192.168.1.0/24, hostname, domainname]
+									这东西用在安全机制上面，也就是管制『只有这里面规定的IP 或者是主机名称可以登入！』如果是 0.0.0.0 表示所有的PC 皆可登入，如果是192.168.1.0/24 则表示为C class 的网域！亦即由 192.168.1.1 ~ 192.168.1.255 皆可登入！另外，也可以选择domain name ，例如 .dic.ksu.edu.tw 就可以允许昆山资传系网域的IP 登入你的主机使用该server ！
+		no_access (防火墙机制)		设定值：[0.0.0.0, 192.168.1.0/24, hostname, domainname]
+									跟only_from 差不多啦！就是用来管理可否进入你的Linux 主机启用你的server 服务的管理项目！no_access 表示『不可登入』的PC 啰！
+		access_times (时间控管)		设定值：[00:00-12:00, HH:MM-HH:MM]
+									这个项目在设定『该服务server 启动的时间』，使用的是24 小时的设定！例如你的ftp 要在 8 点到16 点开放的话，就是： 08:00-16:00。
+		umask						设定值：[000, 777, 022]
+									设定使用者建立目录或者是档案时候的属性！系统建议值是022 。
+
+
+
+
