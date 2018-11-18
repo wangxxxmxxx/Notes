@@ -198,7 +198,262 @@
 									这个项目在设定『该服务server 启动的时间』，使用的是24 小时的设定！例如你的ftp 要在 8 点到16 点开放的话，就是： 08:00-16:00。
 		umask						设定值：[000, 777, 022]
 									设定使用者建立目录或者是档案时候的属性！系统建议值是022 。
+	5）一个简单的rsync 范例设定
+		super daemon 控管的服务可以多一层管理的手续来达成类似防火墙的机制，底下我们使用rsync 这个可以进行远端镜射(mirror)的服务来说明。rsync 可以让两部主机上面的某个目录一模一样，在远端异地备援系统上面是挺好用的一个机制。而且预设一装好CentOS就已经存在！那就来瞧瞧预设的rsync 设定档！
+			$ vim /etc/xinetd.d/rsync 
+			service rsync   <==服务名称为rsync
+			{
+					disable = no                      <==预设是关闭的！刚刚被我们打开了 
+					socket_type = stream          <==使用TCP的连线机制之故 
+					wait = no              <==可以同时进行大量连线功能 
+					user = root            <==启动服务为root这个身份 
+					server = /usr/bin/rsync <==就是这支程式启动rsync的服务啰 
+					server_args = --daemon        <==这是必要的选项啊！
+					log_on_failure += USERID         <==登入错误时，额外记录使用者ID
+			}
+		能不能修改user成为其他身份呢？由于在/etc/services 当中规定rsync使用的埠口号码为873 ，这个埠口小于1024 ，所以理论上启动这个埠口的身份一定要是root 才行！这里user先别乱改！目前测试机有两个网络接口，一个是192.168.1.100 ，一个则是127.0.0.1， 假设我将192.168.1.100 设计为对外网域， 127.0. 0.1 为内部网域，且内外网域的分别权限设定为：
+			对内部127.0.0.1 网域开放较多权限的部分：
+				这里的设定值需绑在127.0.0.1 这个介面上；
+				对127.0.0.0/8 开放登入权限；
+				不进行任何连线的限制，包括总连线数量与时间；
+				但是127.0.0.100 及127.0.0.200 不允许登入rsync 服务。
+			对外部192.168.1.100 网域较多限制的设定：
+				对外设定绑住192.168.1.100 这个介面；
+				这个介面仅开放140.116.0.0/16 这个B 等级的网域及.edu.tw 网域可以登入；
+				开放的时间为早上1-9 点以及晚上20-24 点两个时段；
+				最多允许10 条同时连线的限制。
+			127.0.0.1是内部回圈测试用的IP ，用他来设计网路是没有意义的。不过，我们这里仅是作一个设计的介绍
+			这样的规划情况下，我们可以将刚刚上头的/etc/xinetd.d/rsync 这个档案修改成为：
+				$ vim /etc/xinetd.d/rsync 
+				#先针对对内的较为松散的限制来设定：
+				service rsync
+				{
+						disable = no                         <==要启动才行啊！
+						bind = 127.0.0.1          <==服务绑在这个介面上！
+						only_from = 127.0.0.0/8        <==只开放这个网域的来源登入 
+						no_access = 127.0.0.{100,200} <==限制这两个不可登入 
+						instances = UNLIMITED          <==取代/etc/xinetd.conf的设定值 
+						socket_type = stream             <==底下的设定则保留
+						wait = no
+						user = root
+						server = /usr/bin/rsync
+						server_args = --daemon
+						log_on_failure += USERID
+				}
 
+				#再针对外部的连线来进行限制呢！
+				service rsync
+				{
+						disable = no
+						bind = 192.168.1.100
+						only_from = 140.116.0.0/16
+						only_from += .edu.tw            <==因为累加，所以利用+=设定 
+						access_times = 01:00-9:00 20:00-23:59 <==时间有两时段，有空格隔开 
+						instances = 10                 < ==只有10条连线
+						socket_type = stream
+						wait = no
+						user = root
+						server = /usr/bin/rsync
+						server_args = --daemon
+						log_on_failure += USERID
+				}
+			在上面这个设定档中,共写了两段service rsync 的设定，一段针对内部网域一段针对外部网域，如果设计完毕将他重新启动，就会出现如下的状态:
+				0.先看看原本的873状态为何！
+				$ netstat -tnlp | grep 873 
+				tcp 0 0 0.0.0.0:873       0.0.0.0:* LISTEN 4925/xinetd
+				 #仔细看，仅针对0.0.0.0这个全域网域监听而已哩！
 
+				# 1.重新启动xinetd吧！不是启动rsync喔！别搞错。
+				$ /etc/init.d/xinetd restart 
+				$ netstat -tnlp | grep 873 
+				tcp 0 0 192.168.1.100:873      0.0.0.0:* LISTEN 7227/xinetd
+				tcp 0 0 127.0.0.1:873          0.0.0.0:* LISTEN 7227/xinetd
+				 #两个网络接口啊～而且， PID会是同一个呢！
+			如同上面的设定，将某个系统服务针对不同的用户端来源指定不同的使用权限！这样子系统服务可以安全多了。
+	6）服务的防火墙管理xinetd, TCP Wrappers
+		一般来说，系统的防火墙分析主要可以透过封包过滤或者是透过软体分析，我们的Linux 预设有提供一个软体分析的工具， 那就是/etc/hosts.deny, /etc/hosts.allow 这两个设定档！另外，如果有安装tcp wrappers 套件时， 我们甚至可以加上一些额外的追踪功能呢！
+		1-/etc/hosts.allow, /etc/hosts.deny 管理
+			管制at的使用可以透过修订/etc/at.{allow|deny} 来管理，至于crontab 则是使用/etc/cron.{allow|deny} 来管理的。那么有没有办法透过个什么机制，就能够管理某些程式的网路使用呢？就有点像管理某些程式是否能够接受或者是拒绝来自网际网路的连线的意思啦！有的！那就是/etc/hosts.{allow|deny} 啰。
+			任何以xinetd管理的服务，都可以透过/etc/hosts.allow, /etc/hosts.deny来设定防火墙。那么什么是防火墙呢？简单的说，就是针对来源IP或网域进行允许或拒绝的设定，以决定该连线是否能够成功达成连接的一种方式就是了。其实我们刚刚修改/etc/xinetd.d/rsync里头的no_access, only_from也可以进行这方面的防火墙设定。不过，使用/etc/hosts.allow, /etc/hosts.deny则更容易集中控管，在设定与查询方面也较为方便！那么就让我们谈谈这两个档案的设定技巧吧！
+			其实/etc/hosts.allow 与/etc/hosts.deny 也是/usr/sbin/tcpd 的设定档，而这个/usr/sbin/tcpd 则是用来分析进入系统的TCP 网路封包的一个软体，TCP是一种连线导向的网路连线封包，包括www, email, ftp 等等都是使用TCP 封包来达成连线的喔。所以啰，顾名思义，这个套件本身的功能就是在分析TCP 网路资料封包啦！而TCP 封包的档头主要记录了来源与目主机的IP 与port ，因此藉由分析TCP 封包并搭配/etc/hosts.{allow,deny} 的规则比对，就可以决定该连线是否能够进入我们的主机啦。所以啦，我们要使用TCP Wrappers 来控管的就是：
+				来源IP 或/与整个网域的IP 网段；
+				port (就是服务啦，前面有谈到启动某个埠口是daemon 的责任啊)
+			基本上只要一个服务受到xinetd 管理，或者是该服务的程式支援TCP Wrappers 函式的功能时，那么该服务的防火墙方面的设定就能够以 /etc/hosts.{allow,deny} 来处理啰。换个方式来说，只要不支援TCP Wrappers 函式功能的软体程式就无法使用/etc/hosts.{allow,deny} 的设定值啦，这样说，有没有比较清楚啊。不过，那要如何得知一个服务的程式有没有支援TCP Wrappers 呢，你可以这样简单的处理喔。
+				范例一：测试一下达成sshd及httpd这两个程式有无支援TCP Wrappers的功能 
+					$ ldd $(which sshd httpd)
+					/usr/sbin/sshd:
+							libwrap.so.0 => /usr/lib64/libwrap.so.0 (0x00002abcbfaed000)
+							libpam.so.0 => /lib64/libpam.so.0 (0x00002abcbfcf6000)
+					....(中间省略)....
+					/usr/sbin/httpd:
+							libm.so.6 => /lib64/libm.so.6 (0x00002ad395843000)
+							libpcre.so.0 => /lib64/libpcre.so.0 (0x00002ad395ac6000)
+					....(底下省略).... 
+					#重点在于软体有没有支援libwrap.so那个函式库啰
+				ldd (library dependency discovery) 这个指令可以查询某个程式的动态函式库支援状态，因此透过这个ldd 我们可以轻松的就查询到sshd, httpd 有无支援tcp wrappers 所提供的libwrap.so 这个函式库档案。从上表的输出中我们可以发现， sshd 有支援但是httpd 则没有支援。因此我们知道sshd 可以使用/etc/hosts.{allow,deny} 进行类似防火墙的抵挡机制，但是httpd 则没有此项功能喔！
+			设定档语法
+				这两个档案的设定语法都是一样的，基本上，看起来应该像这样：
+					<service(program_name)> : <IP, domain, hostname> : <action>
+					<服务(亦即程式名称)> : <IP 或领域或主机名称> : < 动作>
+					# 上头的< > 是不存在于设定档中！
+				举例来说上面我们谈到过rsync设定档内不是有server的参数吗？rsync设定档内/usr/bin/rsync为其参数值，那么在我们这里就得要写成rsync即可喔！依据rsync的设定档资料，我们将抵挡的127.0.0.100, 127.0.0.200,及放行的140.116.0.0/16写在这里，内容有点像这样：
+					$ vim /etc/hosts.deny 
+					rsync : 127.0.0.100 127.0.0.200 : deny
+					或者：
+					$ vim /etc/hosts.deny 
+					rsync : 127.0.0.100 : deny
+					rsync : 127.0.0.200 : deny
+			为什么要设定成 /etc/hosts.allow 及/etc/hosts.deny 两个档案呢？其实只要有一个档案存在就够了， 不过，为了设定方便起见，我们存在两个档案，其中需要注意的是：
+				写在hosts.allow 当中的IP 与网段，为预设『可通行』的意思，亦即最后一个栏位allow 可以不用写；
+				而写在hosts.deny 当中的IP 与网段则预设为deny ，第三栏的deny 亦可省略；
+				这两个档案的判断依据是： (1) 以/etc/hosts.allow 为优先，而(2) 若分析到的IP 或网段并没有记录在/etc/hosts.allow ，则以/etc/ hosts.deny 来判断。
+			也就是说， /etc/hosts.allow 的设定优先于/etc/hosts.deny 啰！基本上，只要hosts.allow 也就够了，因为我们可以将 allow 与deny 都写在同一个档案内，只是这样一来似乎显得有点杂乱无章，因此，通常我们都是：
+				允许进入的写在/etc/hosts.allow 当中；
+				不许进入的则写在/etc/hosts.deny 当中。
+			此外，我们还可以使用一些特殊参数在第一及第二个栏位喔！内容有：
+				ALL：代表全部的program_name 或者是IP 都接受的意思，例如ALL: ALL: deny
+				LOCAL：代表来自本机的意思，例如： ALL: LOCAL: allow
+				UNKNOWN：代表不知道的IP 或者是domain 或者是服务时；
+				KNOWN：代表为可解析的IP, domain 等等资讯时；
+			以rsync 为例子来说明好了，现在假设一个比较安全的流程来设定，就是：
+				只允许140.116.0.0/255.255.0.0 与203.71.39.0/255.255.255.0 这两个网域，及203.71.38.123 这个主机可以进入我们的rsync 伺服器；
+				此外，其他的IP 全部都挡掉！
+					$ vim /etc/hosts.allow 
+					rsync: 140.116.0.0/255.255.0.0
+					rsync: 203.71.39.0/255.255.255.0
+					rsync: 203.71.38.123
+					rsync: LOCAL
+					$ vim /etc/hosts.deny 
+					rsync: ALL  <==利用ALL设定让所有其他来源不可登入
+	7）TCP Wrappers 特殊功能
+		那么有没有更安全的设定？例如，当有其他人扫瞄我的rsync port时，我就将他的IP记住，以做为未来的查询与认证之用呢？是有的！只是，那就得要有额外的动作参数加在第三栏了，而且你还需要安装了TCP Wrappers软体才行。要确定有没有安装TCP Wrappers可以使用『 rpm -q tcp_wrappers 』来查询喔。至于更加细部的主要动作则有：
+			spawn (action)
+			可以利用后续接的shell来进行额外的工作，且具有变数功能，主要的变数内容为： %h (hostname), %a (address), %d (daemon)等等；
+			twist (action)
+			立刻以后续的指令进行，且执行完后终止该次连线的要求(DENY)
+		为了达成追踪来源目标的相关资讯的目的，此时我们需要safe_finger 这个指令的辅助才行。而且我们还希望用户端的这个恶意者能够被警告。整个流程可以是这样的：
+			利用safe_finger 去追踪出对方主机的资讯(包括主机名称、使用者相关资讯等)；
+			将该追踪到的结果以email 的方式寄给我们本机的root ；
+			在对方萤幕上面显示不可登入且警告他已经被记录的讯息
+			由于是抵挡的机制，因此我们这个spawn 与twist 的动作大多是写在/etc/hosts.deny 档案中的。我们将上述的动作写成类似如下：
+				$ vim /etc/hosts.deny 
+				rsync : ALL: spawn (echo "security notice from host $(/bin/hostname)" ;\
+				echo; /usr/sbin/safe_finger @%h ) | \
+				/bin/mail -s "%d-%h security" root & \
+				: twist ( /bin/echo -e "\n\nWARNING connection not allowed.\n\n" )
+				上面其实是针对一个rsync 所写的资讯，你可以看到上面这四行共有三个冒号来隔开，意义是：
+				rsync： 指的就是rsync 这个服务的程式；
+				ALL： 指的是来源，这个范围指的当然是全部的所有来源啰，因为是ALL 嘛！
+				spawn (echo "security notice from host $(/bin/hostname)" ; echo ; /usr/sbin/safe_finger @%h ) | /bin/mail -s "%d-%h security" root &： 由于要将一些侦测的资料送给root 的邮件信箱，因此需要使用资料流汇整的括号( )，括号内的重点在于safe_finger 的项目，他会侦测到用户端主机的相关资讯，然后使用管线命令将这些资料送给mail处理， mail会将该资讯以标头为security 的字样寄给root！由于spawn 只是中间的过程，所以还能够有后续的动作！
+				twist ( /bin/echo -e "\n\nWARNING connection not allowed.\n\n" )： 这个动作会将Warning 的字样传送到用户端主机的萤幕上！然后将该连线中断。
+	8）系统开启的服务
+		你已经知道了daemons的启动档案放置的目录，也知道了服务与port的对应，那么要如何查询目前系统上面已经启动了的服务呢？可以使用ps与top来找寻已经启动了的服务的程序与他的PID呢！不过，我们怎么知道该服务启动的port是哪一个？呵呵！好问题！可以直接使用 netstat这个网路状态观察指令来检查我们的port呢！甚至他也可以帮我们找到该port的程序呢(PID)！
+	9）观察系统启动的服务
+		观察系统已启动的服务方式很多，不过，我们最常使用netstat 来观察。基本上，以ps 来观察整个系统上面的服务是比较妥当的，因为他可以将全部的process 都找出来。不过，我们比较关心的还是在于有启动网路监听的服务， 所以会使用netstat 来查阅。
+			范例一：找出目前系统开启的『网路服务』有哪些？
+			$ netstat -tulp
+			Active Internet connections (only servers)
+			Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name
+			tcp 0 0 www.vbird.tsai:2208 *:* LISTEN 4575/hpiod
+			tcp 0 0 *:737 *:* LISTEN 4371/rpc.statd
+			tcp 0 0 *:sunrpc *:* LISTEN 4336/portmap
+			tcp 0 0 www.vbird.tsai:ipp *:* LISTEN 4606/cupsd
+			tcp 0 0 www.vbird.tsai:smtp *:* LISTEN 4638/sendmail: acce
+			tcp 0 0 *:ssh *:* LISTEN 4595/sshd
+			udp 0 0 *:filenet-tms *:* 4755/avahi-daemon:
+			....(底下省略)....
+			# 看一下上头， Local Address 的地方会出现主机名称与服务名称的，要记得的是，
+			# 可以加上-n 来显示port number ，而服务名称与port 对应则在/etc/services
 
+			范例二：找出所有的有监听网路的服务(包含socket状态)： 
+			$ netstat -lnp
+			Active Internet connections (only servers)
+			Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name
+			tcp 0 0 127.0.0.1:2208 0.0.0.0:* LISTEN 4575/hpiod
+			....(中间省略)....
+			Active UNIX domain sockets (only servers)
+			Proto RefCnt Flags Type State I-Node PID/Program name Path
+			....(中间省略)....
+			unix 2 [ ACC ] STREAM LISTENING 10624 4701/xfs /tmp/.font-unix/fs7100
+			unix 2 [ ACC ] STREAM LISTENING 12824 5015/Xorg /tmp/.X11-unix/X0
+			unix 2 [ ACC ] STREAM LISTENING 12770 4932/gdm-binary /tmp/.gdm_socket
+			....(以下省略)....
+			# 仔细的瞧一瞧啊，除了原有的网路监听port 之外，还会有socket 显示在上面，
+			# 我们可以清楚的知道有哪些服务被启动呢！
+
+			范例三：观察所有的服务状态 
+			$ service --status-all 
+		利用netstat可以取得很多跟网路有关的服务资讯，透过这个指令，我们可以轻易的了解到网路的状态， 并且可以透过PID 与kill 的相关功能，将有问题的资料给他剔除说～ 当然啦，要更详细的取得PPID 的话，才能够完全的抵挡有问题的程序！
+	10）另外，除了已经存在系统当中的daemon 之外，如何在一开机就完整的启动我们所需要的服务呢？底下我们就来谈一谈chkconfig 及ntsysv！
+		1）设定开机后立即启动服务的方法
+			就如同上面提到的，我们使用netstat仅能观察到目前已经启动的daemon ，使用 service这个指令或者是『 /etc/init.d/* start 』的方法则仅能在目前的环境下立即启动某个服务而已。那么重新开机后呢？该服务是否还是继续的自动启动？这个时候我们就得要了解一下，到底我的Linux主机是怎么开机的呢？
+				打开电脑电源，开始读取BIOS 并进行主机的自我测试；
+				透过BIOS 取得第一个可开机装置，读取主要开机区(MBR) 取得开机管理程式；
+				透过开机管理程式的设定，取得kernel 并载入记忆体且侦测系统硬体；
+				核心主动呼叫init 程式；
+				init程式开始执行系统初始化(/etc/rc.d/rc.sysinit)
+				依据init 的设定进行daemon start (/etc/rc.d/rc[0-6].d/*)
+				载入本机设定(/etc/rc.d/rc.local)
+			关于更多开机流程的详细说明，我们会在第二十章时再来跟大家说明。由上面的流程你可以看到系统服务在开机时就可以被启动的地方是在第六个步骤，而事实上第六个步骤就是以不同的执行等级呼叫不同的服务啦！那么什么叫做执行等级呢？
+			我们在启动Linux 系统时，可以进入不同的模式喔，这模式我们称为执行等级(run level)。不同的执行等级有不同的功能与服务， 目前你先知道正常的执行等级有两个，一个是具有X 视窗介面的run level 5 ，另一个则是纯文字介面的run level 3。由于预设我们是以图形介面登入系统的，因此可以想像得到的是，我们应该是在run level 5 的环境中啦！那你怎么知道run level 5 有哪些服务预设可以启动呢？这就得要使用特殊的指令来查询啊！
+			chkconfig： 管理系统服务预设开机启动与否
+				$ chkconfig --list [服务名称] 
+				$ chkconfig [--level [0123456]] [服务名称] [on|off] 
+				选项与参数：
+				--list ：仅将目前的各项服务状态列出来
+				--level：设定某个服务在该level 下启动(on) 或关闭(off)
+
+				范例一：列出目前系统上面所有被chkconfig管理的服务 
+				$chkconfig --list |more
+				NetworkManager 0:off 1:off 2:off 3:off 4:off 5:off 6:off
+				acpid 0:off 1:off 2:off 3:on 4:on 5:on 6:off
+				....(中间省略)....
+				yum-updatesd 0:off 1:off 2:on 3:on 4:on 5:on 6:off
+
+				xinetd based services:   <==底下为super daemon所管理的服务
+						chargen-dgram: off
+						chargen-stream: off
+				....(底下省略)....
+				# 你可以发现上面的表格有分为两个区块，一个具有1, 2, 3 等数字，一个则被xinetd 
+				# 管理。没错！从这里我们就能够发现服务有stand alone 与super daemon 之分。
+
+				范例二：显示出目前在run level 3为启动的服务 
+				$ chkconfig --list | grep '3:on'
+
+				范例三：让atd这个服务在run level为3, 4, 5时启动： 
+				$ chkconfig --level 345 atd on
+			chkconfig 仅是设定开机时预设会启动的服务而已， 所以该服务目前的状态如何是不知道的
+				范例四：先观察httpd ，再观察预设有无启动，之后以chkconfig设定为预设启动 
+				$ /etc/init.d/httpd status 
+				httpd已停止   <==根本就没有启动
+
+				$ chkconfig --list httpd
+				httpd 0:off 1:off 2:off 3:off 4:off 5:off 6:off
+				# 原因是预设并没有启动啊！
+
+				$ chkconfig httpd on; chkconfig --list httpd
+				httpd 0:off 1:off 2:on 3:on 4:on 5:on 6:off
+				# 已经设定为『开机预设启动』了，再来观察看看到底该服务启动没？
+
+				$ /etc/init.d/httpd status
+				httpd 已停止
+				# 哈！竟然还是没有启动喔！怎么会这样啊？
+			上面的范例四并没有启动httpd的原因很简单，我们仅是设定开机时启动而已啊！没有重新开机，使用chkconfig并不会导致该服务立即被启动！也不会让该服务立即被关闭，而是只有在开机时才会被载入或取消载入而已喔。而既然chkconfig可以设定开机是否启动，那么我们能不能用来管理super daemon的启动与关闭呢？非常好！我们就来试看看底下的案例
+				范例五：查阅rsync是否启动，若要将其关闭该如何处理？
+				$ /etc/init.d/rsync status
+				-bash: /etc/init.d/rsync: No such file or directory
+				# rsync 是super daemon 管理的，所以当然不可以使用stand alone 的启动方式来观察
+
+				$ netstat -tlup | grep rsync
+				tcp 0 0 192.168.201.110:rsync *:* LISTEN 4618/xinetd
+				tcp 0 0 www.vbird.tsai:rsync *:* LISTEN 4618/xinetd
+
+				$ chkconfig --list rsync 
+				rsync on    <==预设启动呢！将它处理成预设不启动吧
+
+				$ chkconfig rsync off; chkconfig --list rsync 
+				rsync off   <==看吧！关闭了喔！现在来处理一下super daemon的东东！
+
+				$ /etc/init.d/xinetd restart; netstat -tlup | grep rsync
+				#你会发现原本rsync 不见了
 
