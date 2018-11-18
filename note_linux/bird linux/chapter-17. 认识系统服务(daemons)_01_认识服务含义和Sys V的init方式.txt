@@ -396,7 +396,7 @@
 				载入本机设定(/etc/rc.d/rc.local)
 			关于更多开机流程的详细说明，我们会在第二十章时再来跟大家说明。由上面的流程你可以看到系统服务在开机时就可以被启动的地方是在第六个步骤，而事实上第六个步骤就是以不同的执行等级呼叫不同的服务啦！那么什么叫做执行等级呢？
 			我们在启动Linux 系统时，可以进入不同的模式喔，这模式我们称为执行等级(run level)。不同的执行等级有不同的功能与服务， 目前你先知道正常的执行等级有两个，一个是具有X 视窗介面的run level 5 ，另一个则是纯文字介面的run level 3。由于预设我们是以图形介面登入系统的，因此可以想像得到的是，我们应该是在run level 5 的环境中啦！那你怎么知道run level 5 有哪些服务预设可以启动呢？这就得要使用特殊的指令来查询啊！
-			chkconfig： 管理系统服务预设开机启动与否
+			1-chkconfig： 管理系统服务预设开机启动与否
 				$ chkconfig --list [服务名称] 
 				$ chkconfig [--level [0123456]] [服务名称] [on|off] 
 				选项与参数：
@@ -456,4 +456,39 @@
 
 				$ /etc/init.d/xinetd restart; netstat -tlup | grep rsync
 				#你会发现原本rsync 不见了
+			2-ntsysv： 类图形介面管理模式
+				基本上， chkconfig 真的已经很好用了，不过，我们的CentOS还有提供一个更不错的， 那就是ntsysv！注意喔， chkconfig 很多的distributions 都存在，但是ntsysv 则是Red Hat 系统特有的！
+				$ ntsysv [--level <levels>] 
+				选项与参数：
+				--level ：后面可以接不同的run level ，例如ntsysv --level 35
+			3-chkconfig： 设定自己的系统服务
+				chkconfig [--add|--del] [服务名称] 
+				选项与参数：
+				--add ：增加一个服务名称给chkconfig 来管理，该服务名称必须在/etc/init.d/ 内
+				--del ：删除一个给chkconfig 管理的服务
+				如果自己写了一个程式并且想要让该程式成为系统服务好让chkconfig 来管理时， 可以怎么进行呢？只要将该服务加入init 可以管理的script 当中，亦即是/etc/init.d/当中即可。举个例子，我们在/etc/init.d/里面建立一个test.sh档案，该档案仅是一个简单的服务范例，基本上，没有任何用途.... 对于该档案的必须性是这样的：
+				test.sh 将在run level 3 及5 启动；
+				test.sh 在/etc/rc.d/rc[35].d 当中启动时，以80 顺位启动，以70 顺位结束。
+					$ vim /etc/init.d/test.sh
+					#!/bin/bash
+					# chkconfig: 35 80 70
+					# description: 没啥！只是用来作为练习之用的一个范例
+					echo "Nothing"
+				基本上，比较重要的是第二行，他的语法是： 『 chkconfig: [runlevels] [启动顺位] [停止顺位] 』其中， runlevels 为不同的run level 状态，启动顺位(start number) 与结束顺位(stop number) 则是在/etc/rc.d/rc[35].d 内建立以S80myvbird 及K70myvbird 为档名的设定方式！
+					$ chkconfig --list myvbird
+					service myvbird supports chkconfig, but is not referenced in any 
+					runlevel (run 'chkconfig --add myvbird')
+					# 尚未加入chkconfig 的管理机制中！所以需要再动点手脚
+
+					$ chkconfig --add myvbird; chkconfig --list myvbird
+					myvbird 0:off 1:off 2:off 3:on 4:off 5:on 6:off
+					#看吧！加入了chkconfig的管理当中了！
+					#很有趣吧！如果要将这些资料都删除的话，那么就下达这样的情况：
+
+					$ chkconfig --del myvbird 
+					$ rm /etc/init.d/myvbird
+				chkconfig是个不错用的工具！尤其是当你想要自己建立自己的服务时。
+	11）CentOS 5.x 预设启动的服务简易说明
+		随着Linux 上面软体支援性越来越多，加上自由软体蓬勃的发展，我们可以在Linux 上面用的daemons 真的越来越多了。所以，想要写完所有的daemons 介绍几乎是不可能的，可以使用ntsysv 或者是vi /etc/init.d/* 里面的档案去瞧一瞧。
+					
 
