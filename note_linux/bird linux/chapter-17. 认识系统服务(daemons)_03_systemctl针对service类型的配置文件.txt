@@ -1,0 +1,203 @@
+1、systemctl 针对service 类型的配置文件
+	我们如果想要建立系统服务，就得要到/etc/init.d/底下去建立相对应的bashshellscript来处理。那么现在systemd的环境底下，如果我们想要设定相关的服务启动环境，那应该如何处理:
+	1-systemctl配置文件相关目录简介
+		服务的管理是透过systemd，而systemd的配置文件大部分放置于/usr/lib/systemd/system/ 目录内。但是Red Hat 官方文件指出， 该目录的文件主要是原本软件所提供的设定，建议不要修改！而要修改的位置应该放置于/etc/systemd/system/ 目录内。举例来说，如果你想要额外修改vsftpd.service 的话，他们建议要放置到哪些地方呢？
+		/usr/lib/systemd/system/vsftpd.service：
+			官方释出的预设配置文件；
+		/etc/systemd/system/vsftpd.service.d/custom.conf：
+			在/etc/systemd/system 底下建立与配置文件相同文件名的目录，但是要加上.d 的扩展名。然后在该目录下建立配置文件即可。另外，配置文件最好附档名取名为.conf较佳！ 在这个目录下的文件会『累加其他设定』进入/usr/lib/systemd/system/vsftpd.service 内！
+ 		/etc/systemd/system/vsftpd.service.wants/*：
+			此目录内的文件为链接档，设定相依服务的连结。意思是启动了vsftpd.service 之后，最好再加上这目录底下建议的服务。
+		/etc/systemd/system/vsftpd.service.requires/*：
+			此目录内的文件为链接档，设定相依服务的连结。意思是在启动vsftpd.service 之前，需要事先启动哪些服务的意思。
+	基本上，在配置文件里面你都可以自由设定相依服务的检查，并且设定加入到哪些 target 里头去。但是如果是已经存在的配置文件，或者是官方提供的配置文件，Red Hat 是建议你不要修改原设定，而是到上面提到的几个目录去进行额外的客制化设定比较好！如果你硬要修改原始的/usr/lib/systemd/system 底下的配置文件，那也是OK 没问题的！并且也能够减少许多配置文件的增加。
+	2-systemctl 配置文件的设定项目简介
+		1）/usr/lib/systemd/system/sshd.service为例：
+			[Unit]： 
+				unit 本身的说明，以及与其他相依daemon 的设定，包括在什么服务之后才启动此unit 之类的设定值；
+			[Service], [Socket], [Timer], [Mount], [Path]..：
+				不同的unit type 就得要使用相对应的设定项目。我们拿的是sshd.service 来当模板，所以这边就使用[Service] 来设定。这个项目内主要在规范服务启动的脚本、环境配置文件档名、重新启动的方式等等。
+			[Install]：
+				这个项目就是将此unit 安装到哪个target 里面去的意思！
+		2）配置文件内有些设定规则还是得要说明一下：
+			设定项目通常是可以重复的，例如我可以重复设定两个After在配置文件中，不过，后面的设定会取代前面的！因此，如果你想要将设定值归零，可以使用类似『After= 』的设定，亦即该项目的等号后面什么都没有，就将该设定归零了(reset)。
+ 			如果设定参数需要有『是/否』的项目(布尔值, boolean)，你可以使用1, yes, true, on 代表启动，用0, no, false,off 代表关闭！
+			空白行、开头为# 或; 的那一行，都代表批注！
+		3）每个部份里面还有很多的设定细项，我们使用一个简单的表格来说明每个项目：
+		[Unit] 部份
+			Description
+				就是当我们使用systemctl list-units 时，会输出给管理员看的简易说明！使用 systemctlstatus 输出的此服务的说明，也是这个项目！
+			Documentation
+				这个项目在提供管理员能够进行进一步的文件查询的功能！提供的文件可以是如下的资料：
+ 					Documentation=http://www....
+ 					Documentation=man:sshd(8)
+ 					Documentation=file:/etc/ssh/sshd_config
+			After
+				说明此 unit 是在哪个 daemon 启动之后才启动的意思！基本上仅是说明服务启动的顺序而已，并没有强制要求里头的服务一定要启动后此 unit 才能启动。 以 sshd.service 的内容为例，该文件提到 After 后面有 network.target 以及 sshd-keygen.service，但是若这两个 unit 没有启动而强制启动 sshd.service 的话， 那么 sshd.service 应该还是能够启动的！这与 Requires 的设定是有差异的喔！
+			Before
+				与After的意义相反，是在什么服务启动前最好启动这个服务的意思。不过这仅是规范服务启动的顺序，并非强制要求的意思。
+			Requires
+				明确的定义此unit需要在哪个daemon启动后才能够启动！就是设定相依服务啦！如果在此项设定的前导服务没有启动，那么此 unit 就不会被启动！
+			Wants
+				与 Requires 刚好相反，规范的是这个 unit 之后最好还要启动什么服务比较好的意思！不过，并没有明确的规范就是了！主要的目的是希望建立让使用者比较好操作的环境。 因此，这个 Wants后面接的服务如果没有启动，其实不会影响到这个 unit 本身！
+			Conflicts
+				代表冲突的服务！亦即这个项目后面接的服务如果有启动，那么我们这个 unit 本身就不能启动！我们 unit 有启动，则此项目后的服务就不能启动！ 反正就是冲突性的检查啦！
+		[Service] 部份
+			Type
+				说明这个 daemon 启动的方式，会影响到 ExecStart 喔！一般来说，有底下几种类型
+ 					simple：
+						默认值，这个 daemon 主要由 ExecStart 接的指令串来启动，启动后常驻于内存中。
+ 					forking：
+						由 ExecStart 启动的程序透过 spawns 延伸出其他子程序来作为此 daemon 的主要服务。原生的父程序在启动结束后就会终止运作。 传统的 unit 服务大多属于这种项目，例如 httpd 这个 WWW 服务，当 httpd 的程序因为运作过久因此即将终结了，则 systemd 会再重新生出另一个子程序持续运作后， 再将父程序删除。据说这样的效能比较好！！
+					oneshot：
+						与 simple 类似，不过这个程序在工作完毕后就结束了，不会常驻在内存中。
+					dbus：
+						与 simple 类似，但这个 daemon 必须要在取得一个 D-Bus 的名称后，才会继续运作！因此设定这个项目时，通常也要设定 BusName= 才行！
+					idle：
+						与 simple 类似，意思是，要执行这个 daemon 必须要所有的工作都顺利执行完毕后才会执行。这类的 daemon 通常是开机到最后才执行即可的服务！
+				比较重要的项目大概是simple,forking与oneshot了！毕竟很多服务需要子程序(forking)，而有更多的动作只需要在开机的时候执行一次(oneshot)，例如文件系统的检查与挂载啊等等的。
+			EnvironmentFile
+				可以指定启动脚本的环境配置文件！例如 sshd.service 的配置文件写入到 /etc/sysconfig/sshd 当中！你也可以使用 Environment= 后面接多个不同的 Shell 变量来给予设定！
+			ExecStart
+				就是实际执行此daemon的指令或脚本程序。你也可以使用 ExecStartPre (之前) 以及ExecStartPost (之后) 两个设定项目来在实际启动服务前，进行额外的指令行为。 但是你得要特别注意的是，指令串仅接受『指令 参数 参数...』的格式，不能接受 <, >, >>, |, & 等特殊字符，很多的 bash 语法也不支持喔！ 所以，要使用这些特殊的字符时，最好直接写入到指令脚本里面去！不过，上述的语法也不是完全不能用，亦即，若要支持比较完整的 bash 语法，那你得要使用 Type=oneshot 才行！ 其他的 Type 才不能支持这些字符。
+			ExecStop
+				与 systemctl stop 的执行有关，关闭此服务时所进行的指令。
+			ExecReload 
+				与 systemctl reload 有关的指令行为
+			Restart
+				当设定 Restart=1 时，则当此 daemon 服务终止后，会再次的启动此服务。举例来说，如果你在 tty2 使用文字界面登入，操作完毕后注销，基本上，这个时候 tty2 就已经结束服务了。 但是你会看到屏幕又立刻产生一个新的 tty2 的登入画面等待你的登入！那就是 Restart 的功能！除非使用 systemctl 强制将此服务关闭，否则这个服务会源源不绝的一直重复产生！
+			RemainAfterExit
+				当设定为 RemainAfterExit=1 时，则当这个 daemon 所属的所有程序都终止之后，此服务会再尝试启动。这对于 Type=oneshot 的服务很有帮助！
+			TimeoutSec
+				若这个服务在启动或者是关闭时，因为某些缘故导致无法顺利『正常启动或正常结束』的情况下，则我们要等多久才进入『强制结束』的状态！
+			KillMode
+				可以是 process, control-group, none 的其中一种，如果是 process 则 daemon 终止时，只会终止主要的程序 (ExecStart 接的后面那串指令)，如果是 control-group 时， 则由此 daemon 所产生的其他 control-group 的程序，也都会被关闭。如果是 none 的话，则没有程序会被关闭喔！
+			RestartSec
+				与 Restart 有点相关性，如果这个服务被关闭，然后需要重新启动时，大概要 sleep 多少时间再重新启动的意思。预设是 100ms (毫秒)。
+		[Install] 部份
+			WantedBy
+				这个设定后面接的大部分是 *.target unit ！意思是，这个 unit 本身是附挂在哪一个 target unit 底下的！一般来说，大多的服务性质的 unit 都是附挂在 multi-user.target 底下！
+			Also
+				当目前这个 unit 本身被 enable 时，Also 后面接的 unit 也请 enable 的意思！也就是具有相依性的服务可以写在这里呢！
+			Alias 
+				进行一个连结的别名的意思！当 systemctl enable 相关的服务时，则此服务会进行连结档的建立！以multi-user.target 为例，这个家伙是用来作为预设操作环境 default.target 的规划， 因此当你设定用成default.target 时， 这个/etc/systemd/system/default.target 就会连结到/usr/lib/systemd/system/multi-user.target 啰！
+2、两个vsftpd 运作的实例
+	两个vsftpd使用正常的21以及特殊的555
+		预设的port 21：使用/etc/vsftpd/vsftpd.conf 配置文件，以及/usr/lib/systemd/system/vsftpd.service 设定脚本；
+		特殊的port 555：使用/etc/vsftpd/vsftpd2.conf 配置文件，以及/etc/systemd/system/vsftpd2.service 设定脚本。
+	# 1. 先建立好所需要的配置文件
+		$ cd /etc/vsftpd
+		$ cp vsftpd.conf vsftpd2.conf #然后修改端口
+	# 2. 开始处理启动脚本设定
+		$ cd /etc/systemd/system
+		$ cp /usr/lib/systemd/system/vsftpd.service vsftpd2.service
+		$ vim vsftpd2.service
+			[Unit]
+			Description=Vsftpd second ftp daemon
+			After=network.target
+			[Service]
+			Type=forking
+			ExecStart=/usr/sbin/vsftpd /etc/vsftpd/vsftpd2.conf
+			[Install]
+			WantedBy=multi-user.target
+			# 重点在改了 vsftpd2.conf 这个配置文件！
+	# 3. 重载 systemd 的脚本配置文件内容
+		$ systemctl daemon
+		$ systemctl list-unit-files --all | grep vsftpd
+		$ systemctl status vsftpd2.service
+		$ systemctl restart vsftpd.service vsftpd2.service
+		$ systemctl enable vsftpd.service vsftpd2.service
+		$ systemctl status vsftpd.service vsftpd2.service
+		$ netstat -tlnp
+3、多重的重复设定方式：以getty 为例
+	1）CentOS7开机完成后，有6个终端机可以使用。就是那个tty1~tty6！是由agetty这个指令达成的。那么这个终端机的功能又是从哪个项目所提供的呢？涉及很多层面，主要管理的是getty.target 这个target unit ， 不过，实际产生tty1~tty6 的则是由getty@.service 所提供的！@是啥东西，先来查阅一下/usr/lib/systemd/system/getty@.service 的内容好了：
+		比较重要的是ExecStart项目！man agetty 时，发现到它的语法应该是『agetty--noclear tty1 』之类的字样， 因此，我们如果要启动六个 tty 的时候，基本上应该要有六个启动配置文件。亦即是可能会用到getty1.service, getty2.service...getty6.service 才对！这样控管很麻烦。所以，才会出现这个@ 的项目！这个@ 到底怎么回事呢？我们先来看看getty@.service的上游，亦即是getty.target 这个东西的内容！
+		$ systemctl show getty.target
+			# show 的指令可以将 getty.target 的默认设定值也取出来显示！
+			Names=getty.target
+			Wants=getty@tty1.service
+			WantedBy=multi-user.target
+			Conflicts=shutdown.target
+			Before=multi-user.target
+			After=getty@tty1.service getty@tty2.service getty@tty3.service getty@tty4.service
+			getty@tty6.service gett
+		多出六个service。我们拿getty@tty1.service 来说明一下！当我们执行完getty.target 之后，他会持续要求 getty@tty1.service 等六个服务继续启动。systemd 就会这么作：
+			先看/usr/lib/systemd/system/, /etc/systemd/system/ 有没有getty@tty1.service的设定，若有就执行，若没有则执行下一步；
+ 				找getty@.service 的设定，若有则将@后面的数据带入成%I 的变量，进入getty@.service 执行！
+		getty@tty1.service 实际上是不存在的！他主要是透过getty@.service 来执行～也就是说， getty@.service 的目的是为了要简化多个执行的启动设定， 他的命名方式是这样的：
+			源文件：执行服务名称@.service
+			执行文件：执行服务名称@范例名称.service
+		getty@.service 的启动脚本：
+			ExecStart=-/sbin/agetty --noclear %I $TERM
+		上表中那个%I 指的就是『范例名称』！根据getty.target 的信息输出来看，getty@tty1.service 的%I就是tty1 啰！因此执行脚本就会变成『/sbin/agetty --noclear tty1 』！ 所以我们才有办法以一个配置文件来启动多个tty1 给用户登入！
+	2）将tty 的数量由6 个降低到4 个
+		6 个tty 是谁规定的』为什么不是5 个还是7 个？这是因为systemd 的登入配置文件/etc/systemd/logind.conf 里面规范的！ 假如你想要让 tty 数量降低到剩下4 个的话，那么可以这样实验看看：
+		# 1. 修改预设的 logind.conf 内容，将原本 6 个虚拟终端机改成 4 个
+			$ vim /etc/systemd/logind.conf
+			[Login]
+			NAutoVTs=4
+			ReserveVT=0
+			# 原本是 6 个而且还批注，取消批注，然后改成 4
+		# 2. 关闭不小心启动的 tty5, tty6 并重新启动 getty.target
+			$ systemctl stop getty@tty5.service
+			$ systemctl stop getty@tty6.service
+			$ systemctl restart systemd-logind.service
+		现在你再到桌面环境下，按下[ctrl]+[alt]+[F1]~[F6] 就会发现，只剩下四个可用的tty。那么我暂时需要启动 tty8 时，又该如何处理呢？
+			$ systemctl start getty@tty8.service
+			# 无须额外建立其他的启动服务配置文件
+4、暂时新增vsftpd 到2121 埠口
+	在/usr/lib/systemd/system 底下还有个特别的vsftpd@.service 喔！来看看他的内容：
+	$ cat /usr/lib/systemd/system/vsftpd@.service
+		[Unit]
+		Description=Vsftpd ftp daemon
+		After=network.target
+		PartOf=vsftpd.target
+		[Service]
+		Type=forking
+		ExecStart=/usr/sbin/vsftpd /etc/vsftpd/%i.conf
+		[Install]
+		WantedBy=vsftpd.target
+	根据前面getty@.service 的说明，我们知道在启动的脚本设定当中， %i 或%I 就是代表@ 后面接的范例文件名的意思！那我能不能建立 vsftpd3.conf 文件，然后透过该文件来启动新的服务呢？
+	# 1. 根据 vsftpd@.service 的建议，于 /etc/vsftpd/ 底下先建立新的配置文件
+		$ cd /etc/vsftpd
+		$ cp vsftpd.conf vsftpd3.conf
+		$ vim vsftpd3.conf
+			# 修改端口
+	# 2. 暂时启动这个服务，不要永久启动他！
+		$ systemctl start vsftpd@vsftpd3.service
+		$ systemctl status vsftpd@vsftpd3.service
+		$ netstat -tlnp
+		#为啥这次FTP增加了2121埠口却不用修改SELinux ？这是因为默认启动小于1024 号码以下的端口口时，需要使用到root的权限，因此小于1024以下埠口的启动较可怕。而这次范例中，我们使用2121 端口口，他对于系统的影响可能小一些(其实一样可怕！)， 所以就忽略了SELinux 的限制了！
+5、自己的服务自己作
+	$ vim /backups/backup.sh
+		#!/bin/bash
+		source="/etc /home /root /var/lib /var/spool/{cron,at,mail}"
+		target="/backups/backup-system-$(date +%Y-%m-%d).tar.gz"
+		[ ! -d /backups ] && mkdir /backups
+		tar -zcvf ${target} ${source} &> /backups/backup.log
+	$ chmod a+x /backups/backup.sh
+		# 记得要有可执行的权限才可以
+	$ vim /etc/systemd/system/backup.service
+		[Unit]
+		Description=backup my server
+		Requires=atd.service
+		[Service]
+		Type=simple
+		ExecStart=/bin/bash -c " echo /backups/backup.sh | at now"
+		[Install]
+		WantedBy=multi-user.target
+		# 因为 ExecStart 里面有用到 at 这个指令，因此， atd.service 就是一定要的服务！
+	$ systemctl daemon-reload
+	$ systemctl start backup.service
+	$ systemctl status backup.service
+		backup.service - backup my server
+		Loaded: loaded (/etc/systemd/system/backup.service; disabled)
+		Active: inactive (dead)
+		Aug 13 07:50:31 study.centos.vbird systemd[1]: Starting backup my server...
+		Aug 13 07:50:31 study.centos.vbird bash[20490]: job 8 at Thu Aug 13 07:50:00 2015
+		Aug 13 07:50:31 study.centos.vbird systemd[1]: Started backup my server.
+		为什么 Active 是 inactive 呢？这是因为我们的服务仅是一个简单的 script 啊！
+		# 因此执行完毕就完毕了，不会继续存在内存中！
+	
+	
+
