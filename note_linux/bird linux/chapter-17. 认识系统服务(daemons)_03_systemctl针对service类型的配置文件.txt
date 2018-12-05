@@ -102,7 +102,7 @@
 			WantedBy=multi-user.target
 			# 重点在改了 vsftpd2.conf 这个配置文件！
 	# 3. 重载 systemd 的脚本配置文件内容
-		$ systemctl daemon
+		$ systemctl daemon-reload
 		$ systemctl list-unit-files --all | grep vsftpd
 		$ systemctl status vsftpd2.service
 		$ systemctl restart vsftpd.service vsftpd2.service
