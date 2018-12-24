@@ -1,0 +1,25 @@
+在第六章曾经谈到特殊权限的SUID/SGID/SBIT ，虽然第六章已经将这三种特殊权限作了详细的解释，不过，那么到底这些权限对于『进程』是如何影响的？ 此外，进程可能会使用到系统资源，举例来说，磁盘就是其中一项资源。哪天你在umount 磁盘时，系统老是出现『device is busy 』的字样～到底是怎么回事啊？我们底下就来谈一谈这些和进程有关系的细
+节部分：
+1、具有SUID/SGID 权限的指令执行状态
+	SUID 的权限其实与进程的相关性非常的大！为什么呢？先来看看SUID 的程序是如何被一般用户执行，且具有什么特色呢？
+		SUID 权限仅对二进制程序(binary program)有效；
+		执行者对于该程序需要具有x 的可执行权限；
+		本权限仅在执行该程序的过程中有效(run-time)；
+		执行者将具有该程序拥有者(owner) 的权限。
+	所以说，整个SUID的权限会生效是由于『具有该权限的程序被触发』，而我们知道一个程序被触发会变成进程， 所以啰，执行者可以具有程序拥有者的权限就是在该程序变成进程的那个时候！第六章我们还没谈到进程的概念，所以你或许那时候会觉得很奇怪，为啥执行了passwd后你就具有root 的权限呢？不都是一般使用者执行的吗？ 这是因为你在触发 passwd 后，会取得一个新的进程与PID，该PID 产生时透过SUID 来给予该PID 特殊的权限设定啦！ 我们使用 dmtsai 登入系统且执行passwd 后，透过工作控制来理解一下！
+		$ passwd
+			Changing password for user dmtsai.
+			Changing password for dmtsai
+			(current) UNIX password:	 <==这里按下 [ctrl]-z 并且按下 [enter]
+			[1]+ Stopped passwd
+		$ pstree -uA
+			systemd-+-ModemManager---2*[{ModemManager}]
+			....(中间省略)....
+				|-sshd---sshd---sshd(dmtsai)---bash-+-passwd(root)
+				| 									`-pstree
+			....(底下省略)....
+		从上表的结果我们可以发现，底线的部分是属于dmtsai 这个一般账号的权限，特殊字体的则是root的权限！但你看到了，passwd确实是由bash衍生出来的！不过就是权限不一样！透过这样的解析， 你也会比较清楚为何不同程序所产生的权限不同了吧！这是由于『SUID 程序运作过程中产生的进程』的关系啦！那么既然 SUID/SGID 的权限是比较可怕的，您该如何查询整个系统的SUID/SGID 的文件呢？ 
+			使用find 即可:
+				find / -perm /6000
+2、/proc/* 代表的意义
+	
