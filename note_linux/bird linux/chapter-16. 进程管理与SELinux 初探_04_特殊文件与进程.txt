@@ -22,4 +22,177 @@
 			使用find 即可:
 				find / -perm /6000
 2、/proc/* 代表的意义
-	
+	其实，我们之前提到的所谓的进程都是在内存当中嘛！而内存当中的数据又都是写入到/proc/* 这个目录下的，所以啰，我们当然可以直接观察/proc 这个目录当中的文件啊！ 
+	基本上，目前主机上面的各个进程的PID 都是以目录的型态存在于/proc 当中。举例来说，我们开机所执行的第一支程序systemd 他的PID 是1 ， 这个 PID 的所有相关信息都写入在/proc/1/*当中！若我们直接观察PID 为1 的数据好了，他有点像这样：
+		$ ll /proc/1
+			dr-xr-xr-x. 2 root root 0 Aug 4 19:25 attr
+			-rw-r--r--. 1 root root 0 Aug 4 19:25 autogroup
+			-r--------. 1 root root 0 Aug 4 19:25 auxv
+			-r--r--r--. 1 root root 0 Aug 4 18:46 cgroup
+			--w-------. 1 root root 0 Aug 4 19:25 clear_refs
+			-r--r--r--. 1 root root 0 Aug 4 18:46 cmdline 	<==就是指令串
+			-r--------. 1 root root 0 Aug 4 18:46 environ 	<==一些环境变量
+			lrwxrwxrwx. 1 root root 0 Aug 4 18:46 exe
+			....(以下省略)....
+		里面的数据还挺多的，不过，比较有趣的其实是两个文件，分别是：
+		 cmdline：这个进程被启动的指令串；
+		 environ：这个进程的环境变量内容。
+	这是跟某个特定的PID 有关的内容呢，如果是针对整个Linux 系统相关的参数呢？那就是在/proc 目录底下的文件啦！相关的文件与对应的内容是这样的： 
+		文件名 				文件内容
+		/proc/cmdline 		加载 kernel 时所下达的相关指令与参数！查阅此文件，可了解指令是如何启动的！
+		/proc/cpuinfo 		本机的 CPU 的相关信息，包含频率、类型与运算功能等
+		/proc/devices 		这个文件记录了系统各个主要装置的主要装置代号，与 mknod 有关呢！
+		/proc/filesystems 	目前系统已经加载的文件系统啰！
+		/proc/interrupts 	目前系统上面的 IRQ 分配状态。
+		/proc/ioports 		目前系统上面各个装置所配置的 I/O 地址。
+		/proc/kcore 		这个就是内存的大小啦！好大对吧！但是不要读他啦！
+		/proc/loadavg 		还记得 top 以及 uptime 吧？没错！上头的三个平均数值就是记录在此！
+		/proc/meminfo 		使用 free 列出的内存信息，嘿嘿！在这里也能够查阅到！
+		/proc/modules 		目前我们的 Linux 已经加载的模块列表，也可以想成是驱动程序啦！
+		/proc/mounts 		系统已经挂载的数据，就是用 mount 这个指令呼叫出来的数据啦！
+		/proc/swaps 		到底系统挂加载的内存在哪里？呵呵！使用掉的 partition 就记录在此啦！
+		/proc/partitions 	使用 fdisk -l 会出现目前所有的 partition 吧？在这个文件当中也有纪录喔！
+		/proc/uptime 		就是用 uptime 的时候，会出现的信息啦！
+		/proc/version 		核心的版本，就是用 uname -a 显示的内容啦！
+		/proc/bus/* 		一些总线的装置，还有 USB 的装置也记录在此喔！
+		上面这些文件鸟哥在此建议使用cat 去查阅看看，不必深入了解， 不过，观看过文件内容后，如果未来您想要自行撰写某些工具软件， 那么这个目录底下的相关文件可能会对您有点帮助！
+3、查询已开启文件或已执行进程开启之文件
+	1-fuser：藉由文件(或文件系统)找出正在使用该文件的进程
+		有的时候我想要知道我的进程到底在这次启动过程中开启了多少文件，可以利用fuser 来观察啦！举例来说，你如果卸除时发现系统通知：『device is busy 』，那表示这个文件系统正在忙碌中， 表示有某支进程有利用到该文件系统啦！那么你就可以利用fuser 来追踪啰！fuser 语法有点像这样：
+		$ fuser [-umv] [-k [i] [-signal]] file/dir
+			选项与参数：
+			-u ：除了进程的 PID 之外，同时列出该进程的拥有者；
+			-m ：后面接的那个档名会主动的上提到该文件系统的最顶层，对 umount 不成功很有效！
+			-v ：可以列出每个文件与进程还有指令的完整相关性！
+			-k ：找出使用该文件/目录的 PID ，并试图以 SIGKILL 这个讯号给予该 PID；
+			-i ：必须与 -k 配合，在删除 PID 之前会先询问使用者意愿！
+			-signal：例如 -1 -15 等等，若不加的话，预设是 SIGKILL (-9) 啰！
+		范例一：找出目前所在目录的使用 PID/所属账号/权限 为何？
+			$ fuser -uv .
+							USER 		PID 	ACCESS 	COMMAND
+				/root: 		root 		13888 	..c.. 	(root)bash
+							root 		31743 	..c.. 	(root)bash
+			看到输出的结果没？.』底下有两个PID 分别为13888, 31743 的进程，该进程属于root 且指令为bash 。比较有趣的是那个 ACCESS 的项目，那个项目代表的意义为
+				c ：此进程在当前的目录下(非次目录)；
+				e ：可被触发为执行状态；
+				f ：是一个被开启的文件；
+				r ：代表顶层目录 (root directory)；
+				F ：该文件被开启了，不过在等待回应中；
+				m ：可能为分享的动态函数库；
+		如果你想要查阅某个文件系统底下有多少进程正在占用该文件系统时，那个-m 的选项就很有帮助了！让我们来做几个简单的测试，包括实体的文件系统挂载与/proc 这个虚拟文件系统的内容，看看有多少的进程对这些挂载点或其他目录的使用状态吧！
+		范例二：找到所有使用到 /proc 这个文件系统的进程吧！
+			$ fuser -uv /proc
+				/proc: 		root 	kernel 	mount 	(root)/proc
+							rtkit 	768 	.rc.. 	(rtkit)rtkit-daemon
+				# 数据量还不会很多，虽然这个目录很繁忙～没关系！我们可以继续这样作，看看其他的进程！
+			$ fuser -mvu /proc
+							USER PID 	ACCESS 	COMMAND
+				/proc: 		root kernel mount 	(root)/proc
+							root 1 		f.... 	(root)systemd
+							root 2 		...e. 	(root)kthreadd
+				.....(底下省略).....
+				# 有这几支进程在进行 /proc 文件系统的存取喔！这样清楚了吗？
+		范例三：找到所有使用到 /home 这个文件系统的进程吧！
+			$ echo $$
+				31743 # 先确认一下，自己的 bash PID 号码吧！
+			$ cd /home
+			$ fuser -muv .
+						USER PID ACCESS COMMAND
+			/home: 		root kernel mount (root)/home
+						dmtsai 31535 ..c.. (dmtsai)bash
+						root 31571 ..c.. (root)passwd
+						root 31737 ..c.. (root)sudo
+						root 31743 ..c.. (root)bash # 果然，自己的 PID 在啊！
+			$ cd ~
+			$ umount /home
+				umount: /home: target is busy.
+				(In some cases useful info about processes that use
+				the device is found by lsof(8) or fuser(1))
+				# 从 fuser 的结果可以知道，总共有五只 process 在该目录下运作，那即使 root 离开了 /home，
+				# 当然还是无法 umount 的！那要怎办？哈哈！可以透过如下方法一个一个删除～
+			$ fuser -mki /home
+				/home: 31535c 31571c 31737c # 你会发现， PID 跟上面查到的相同！
+				Kill process 31535 ? (y/N) # 这里会问你要不要删除！当然不要乱删除啦！通通取消！
+		既然可以针对整个文件系统，那么能不能仅针对单一文件啊？当然可以啰！看一下底下的案例先：
+		范例四：找到 /run 底下属于 FIFO 类型的文件，并且找出存取该文件的进程
+			$ find /run -type p
+				.....(前面省略).....
+				/run/systemd/sessions/165.ref
+				/run/systemd/sessions/1.ref
+				/run/systemd/sessions/c1.ref # 随便抓个项目！就是这个好了！来测试一下！
+			$ fuser -uv /run/systemd/sessions/c1.ref
+												USER PID ACCESS COMMAND
+			/run/systemd/sessions/c1.ref:		root 763 f.... (root)systemd-logind
+												root 5450 F.... (root)gdm-session-wor
+			# 通常系统的 FIFO 文件都会放置到 /run 底下，透过这个方式来追踪该文件被存取的 process！
+			# 也能够晓得系统有多忙碌啊！
+	2-lsof ：列出被进程所开启的文件档名
+		相对于 fuser 是由文件或者装置去找出使用该文件或装置的进程，反过来说，如何查出某个进程开启或者使用的文件与装置呢？就是使用lsof:
+		$ lsof [-aUu] [+d]
+			选项与参数：
+			-a ：多项数据需要『同时成立』才显示出结果时！
+			-U ：仅列出 Unix like 系统的 socket 文件类型；
+			-u ：后面接 username，列出该使用者相关进程所开启的文件；
+			+d ：后面接目录，亦即找出某个目录底下已经被开启的文件！
+		
+			范例一：列出目前系统上面所有已经被开启的文件与装置：
+				$ lsof
+					COMMAND PID TID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+					systemd 1 root cwd DIR 253,0 4096 128 /
+					systemd 1 root rtd DIR 253,0 4096 128 /
+					systemd 1 root txt REG 253,0 1230920 967763 /usr/lib/systemd/systemd
+					....(底下省略)....
+					# 注意到了吗？是的，在预设的情况下， lsof 会将目前系统上面已经开启的
+					# 文件全部列出来～所以，画面多的吓人啊！您可以注意到，第一个文件 systemd 执行的
+					# 地方就在根目录，而根目录，嘿嘿！所在的 inode 也有显示出来喔！
+			范例二：仅列出关于 root 的所有进程开启的 socket 文件
+				$ lsof -u root -a -U
+					COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+					systemd 1 root 3u unix 0xffff8800b7756580 0t0 13715 socket
+					systemd 1 root 7u unix 0xffff8800b7755a40 0t0 1902
+					@/org/freedesktop/systemd1/notify
+					systemd 1 root 9u unix 0xffff8800b7756d00 0t0 1903 /run/systemd/private
+					.....(中间省略).....
+					Xorg 4496 root 1u unix 0xffff8800ab107480 0t0 25981 @/tmp/.X11-unix/X0
+					Xorg 4496 root 3u unix 0xffff8800ab107840 0t0 25982 /tmp/.X11-unix/X0
+					Xorg 4496 root 16u unix 0xffff8800b7754f00 0t0 25174 @/tmp/.X11-unix/X0
+					.....(底下省略).....
+					# 注意到那个 -a 吧！如果你分别输入 lsof -u root 及 lsof -U ，会有啥信息？
+					# 使用 lsof -u root -U 及 lsof -u root -a -U ，呵呵！都不同啦！
+					# -a 的用途就是 &&
+			范例三：请列出目前系统上面所有的被启动的周边装置
+				$ lsof +d /dev
+					COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+					systemd 1 root 0u CHR 1,3 0t0 1028 /dev/null
+					systemd 1 root 1u CHR 1,3 0t0 1028 /dev/null
+					# 看吧！因为装置都在 /dev 里面嘛！所以啰，使用搜寻目录即可啊！
+			范例四：属于 root 的 bash 这支程序所开启的文件
+				$ lsof -u root | grep bash
+					ksmtuned 781 root txt REG 253,0 960384 33867220 /usr/bin/bash
+					bash 13888 root cwd DIR 253,0 4096 50331777 /root
+					bash 13888 root rtd DIR 253,0 4096 128 /
+					bash 13888 root txt REG 253,0 960384 33867220 /usr/bin/bash
+					bash 13888 root mem REG 253,0 106065056 17331169 /usr/lib/locale/locale-archive
+					....(底下省略)....
+			这个指令可以找出您想要知道的某个进程是否有启用哪些信息？例如上头提到的范例四的执行结果
+	3-pidof ：找出某支正在执行的程序的PID
+		$ pidof [-sx] program_name
+			选项与参数：
+			-s ：仅列出一个 PID 而不列出所有的 PID
+			-x ：同时列出该 program name 可能的 PPID 那个进程的 PID
+			
+			范例一：列出目前系统上面 systemd 以及 rsyslogd 这两个程序的 PID
+			 $ pidof systemd rsyslogd
+				1 742
+				# 理论上，应该会有两个 PID 才对。上面的显示也是出现了两个 PID 喔。
+				# 分别是 systemd 及 rsyslogd 这两支程序的 PID 啦。
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
