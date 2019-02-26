@@ -17,3 +17,90 @@
 		现在我们知道 DAC 的困扰就是当使用者取得进程后，他可以藉由这支进程与自己预设的权限来处理他自己的文件资源。万一这个用户对 Linux 系统不熟，那就很可能会有资源误用的问题产生。为了避免DAC 容易发生的问题，因此SELinux 导入了委任式访问控制(Mandatory Access Control,MAC) 的方法！
 		委任式访问控制 (MAC) 可以针对特定的进程与特定的文件资源来进行权限的控管！ 也就是说，即使你是root ，那么在使用不同的进程时，你所能取得的权限并不一定是root ， 而得要看当时该进程的设定而定。如此一来，我们针对控制的『主体』变成了『进程』而不是使用者！ 此外，这个主体进程也不能任意使用系统文件资源，因为每个文件资源也有针对该主体进程设定可取用的权限！ 如此一来，控件目就细的多了！但整个系统进程那么多、文件那么多，一项一项控制可就没完没了！ 所以 SELinux 也提供一些预设的政策(Policy) ，并在该政策内提供多个规则(rule) ，让你可以选择是否启用该控制规则！
 		在委任式访问控制的设定下，我们的进程能够活动的空间就变小了！举例来说， WWW 服务器软件的达成进程为httpd 这支程序， 而默认情况下， httpd 仅能在/var/www/ 这个目录底下存取文件，如果httpd 这个进程想要到其他目录去存取数据时， 除了规则设定要开放外，目标目录也得要设成httpd 可读取的模式(type) 才行！限制非常多！ 所以，即使不小心httpd 被cracker 取得了控制权，他也无权浏览/etc/shadow 等重要的配置文件喔！
+2、SELinux 的运作模式
+	一定要首先理解这句话，SELinux 是透过MAC 的方式来控管进程，他控制的主体是进程，而目标则是该进程能否读取的『文件资源』！首先看一下这些概念：
+	1-主体(Subject)：
+		SELinux 主要想要管理的就是进程，因此你可以将『主体』跟谈到的process 划上等号；
+ 	2-目标(Object)：
+		主体进程能否存取的『目标资源』一般就是文件系统。因此这个目标项目可以等文件系统划上等号；
+  3-政策(Policy)：
+		由于进程与文件数量庞大，因此SELinux 会依据某些服务来制订基本的存取安全性政策。这些政策内还会有详细的规则(rule) 来指定不同的服务开放某些资源的存取与否。在目前的CentOS 7.x 里面仅有提供三个主要的政策，分别是：
+			o targeted：针对网络服务限制较多，针对本机限制较少，是预设的政策；
+			o minimum：由target 修订而来，仅针对选择的进程来保护！
+			o mls：完整的SELinux 限制，限制方面较为严格。
+			建议使用预设的targeted 政策即可。
+	4-安全性本文(security context)：
+		我们刚刚谈到了主体、目标与政策面，但是主体能不能存取目标除了政策指定之外，主体与目标的安全性本文必须一致才能够顺利存取。这个安全性本文(security context) 有点类似文件系统的rwx。安全性本文的内容与设定是非常重要的！ 如果设定错误，你的某些服务(主体进程)就无法存取文件系统(目标资源)，就会一直出现『权限不符』的错误讯息了！
+	主体』如何取得『目标』的资源访问权限：
+		(1)主体进程必须要通过SELinux 政策内的规则放行后，就可以与目标资源进行安全性本文的比对
+		(2)若比对失败则无法存取目标，若比对成功则可以开始存取目标。
+		(3)最终能否存取目标还是与文件系统的rwx权限设定有关
+3、安全性本文
+	安全性本文存在于主体进程中与目标文件资源中。进程在内存内，所以安全性本文可以存入是没问题。文件的安全性本文是记录在文件的inode 内，主体进程想要读取目标文件资源时，同样需要读取inode ， 这 inode 内就可以比对安全性本文以及rwx等权限值是否正确，而给予适当的读取权限依据。
+		# 先来观察一下 root 家目录底下的『文件的 SELinux 相关信息』，需要已经启动SELinux
+		$ ls -Z
+			-rw-------. root root system_u:object_r:admin_home_t:s0 anaconda-ks.cfg
+			-rw-r--r--. root root system_u:object_r:admin_home_t:s0 initial-setup-ks.cfg
+	安全性本文主要用冒号分为三个字段，这三个字段的意义为：
+		Identify:role:type
+		身份识别:角色:类型
+	这三个字段的意义仔细的说明一下吧：
+ 		身份识别(Identify)：
+		相当于账号方面的身份识别！主要的身份识别常见有底下几种常见的类型：
+			o unconfined_u：不受限的用户，也就是说，该文件来自于不受限的进程所产生的！一般来说，我们使用可登入账号来取得bash 之后， 预设的bash 环境是不受SELinux 管制的～因为bash 并不是什么特别的网络服务！因此，在这个不受SELinux 所限制的bash 进程所产生的文件，其身份识别大多就是unconfined_u 这个『不受限』用户！
+			o system_u：系统用户，大部分就是系统自己产生的文件啰！
+		基本上，如果是系统或软件本身所提供的文件，大多就是system_u 这个身份名称，而如果是我们用户透过bash 自己建立的文件，大多则是不受限的unconfined_u 身份～如果是网络服务所产生的文件，或者是系统服务运作过程产生的文件，则大部分的识别就会是system_u ！
+ 		角色(Role)：
+		透过角色字段，我们可以知道这个资料是属于进程、文件资源还是代表使用者。一般的角色有：
+			o object_r：代表的是文件或目录等文件资源，这应该是最常见的；
+			o system_r：代表的就是进程！不过，一般使用者也会被指定成为system_r！
+			你也会发现角色的字段最后面使用『 _r 』来结尾！因为是role 的意思嘛！
+		类型(Type) (最重要！)：
+		在预设的 targeted 政策中， Identify 与Role 字段基本上是不重要的！重要的在于这个类型(type) 字段！基本上，一个主体进程能不能读取到这个文件资源，与类型字段有关！而类型字段在文件与进程的定义不太相同，分别是：
+			o type：在文件资源(Object) 上面称为类型(Type)；
+			o domain：在主体进程(Subject) 则称为领域(domain) 了！
+		domain 需要与type 搭配，则该进程才能够顺利的读取文件资源啦！
+4、进程与文件SELinux type 字段的相关性
+	系统中的进程在SELinux 底下的安全本文：
+		# 观察一下系统『进程的 SELinux 相关信息』
+			$ ps -eZ
+			LABEL 							PID 		TTY 	TIME 		CMD
+			system_u:system_r:init_t:s0 	1 			? 		00:00:03 	systemd
+			system_u:system_r:kernel_t:s0 	2 			? 		00:00:00 	kthreadd
+			system_u:system_r:kernel_t:s0 	3 			? 		00:00:00 	ksoftirqd/0
+			.....(中间省略).....
+			unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 31513 ? 00:00:00 sshd
+			unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 31535 pts/0 00:00:00 bash
+			# 基本上进程主要就分为两大类，一种是系统有受限的 system_u:system_r，另一种则可能是用户自己的，
+			# 比较不受限的进程 (通常是本机用户自己执行的程序)，亦即是 unconfined_u:unconfined_r 这两种！
+	基本上，这些对应资料在targeted 政策下的对应如下：
+		unconfined_u unconfined_r
+			一般可登入使用者的进程！比较没有受限的进程之意！大多数都是用户已经顺利登入系统 (不论是网络还是本机登入来取得可用的 shell) 后， 所用来操作系统的进程！如 bash, X window 相关软件等。
+		system_u system_r
+			由于为系统账号，因此是非交谈式的系统运作进程，大多数的系统进程均是这种类型！
+	如上所述，在预设的target 政策下，其实最重要的字段是类型字段(type)， 主体与目标之间是否具有可以读写的权限，与进程的domain 及文件的type 有关！这两者的关系我们可以使用crond以及他的配置文件来说明！ 亦即是 /usr/sbin/crond, /etc/crontab, /etc/cron.d 等文件来说明。首先，看看这几个的安全性本文内容：
+		# 1. 先看看 crond 这个『进程』的安全本文内容：
+			$ ps -eZ | grep cron
+				system_u:system_r:crond_t:s0-s0:c0.c1023 1338 ? 00:00:01 crond
+				system_u:system_r:crond_t:s0-s0:c0.c1023 1340 ? 00:00:00 atd
+				# 这个安全本文的类型名称为 crond_t 格式！
+		# 2. 执行档、配置文件等等的安全本文内容
+			$ ll -Zd /usr/sbin/crond /etc/crontab /etc/cron.d
+				drwxr-xr-x. root root system_u:object_r:system_cron_spool_t:s0 /etc/cron.d
+				-rw-r--r--. root root system_u:object_r:system_cron_spool_t:s0 /etc/crontab
+				-rwxr-xr-x. root root system_u:object_r:crond_exec_t:s0 /usr/sbin/crond
+	当我们执行/usr/sbin/crond 之后，这个程序变成的进程的domain 类型会是crond_t,而这个crond_t 能够读取的配置文件则为system_cron_spool_t 这种的类型。因此不论/etc/crontab, /etc/cron.d以及/var/spool/cron 都会是相关的SELinux 类型(/var/spool/cron 为user_cron_spool_t)。步骤如下：
+		1. 首先，我们触发一个可执行的目标文件，那就是具有crond_exec_t 这个类型的/usr/sbin/crond 文件；
+		2. 该文件的类型会让这个文件所造成的主体进程(Subject) 具有crond 这个领域(domain)， 我们的政策针对这个领域已经制定了许多规则，其中包括这个领域可以读取的目标资源类型；
+		3. 由于crond domain 被设定为可以读取system_cron_spool_t 这个类型的目标文件(Object)， 因此你的配置文件放到/etc/cron.d/ 目录下，就能够被crond 那支进程所读取了；
+		4. 但最终能不能读到正确的资料，还得要看rwx 是否符合Linux 权限的规范！
+	上述的流程告诉我们几个重点，第一个是政策内需要制订详细的domain/type 相关性；第二个是若文件的type 设定错误， 那么即使权限设定为 rwx 全开的777 ，该主体进程也无法读取目标文件资源！不过如此一来， 也就可以避免用户将他的家目录设定为 777 时所造成的权限困扰。
+	
+		
+		
+		
+		
+		
+		
+		
+		
