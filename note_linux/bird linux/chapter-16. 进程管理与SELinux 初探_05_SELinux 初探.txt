@@ -17,86 +17,145 @@
 		现在我们知道 DAC 的困扰就是当使用者取得进程后，他可以藉由这支进程与自己预设的权限来处理他自己的文件资源。万一这个用户对 Linux 系统不熟，那就很可能会有资源误用的问题产生。为了避免DAC 容易发生的问题，因此SELinux 导入了委任式访问控制(Mandatory Access Control,MAC) 的方法！
 		委任式访问控制 (MAC) 可以针对特定的进程与特定的文件资源来进行权限的控管！ 也就是说，即使你是root ，那么在使用不同的进程时，你所能取得的权限并不一定是root ， 而得要看当时该进程的设定而定。如此一来，我们针对控制的『主体』变成了『进程』而不是使用者！ 此外，这个主体进程也不能任意使用系统文件资源，因为每个文件资源也有针对该主体进程设定可取用的权限！ 如此一来，控件目就细的多了！但整个系统进程那么多、文件那么多，一项一项控制可就没完没了！ 所以 SELinux 也提供一些预设的政策(Policy) ，并在该政策内提供多个规则(rule) ，让你可以选择是否启用该控制规则！
 		在委任式访问控制的设定下，我们的进程能够活动的空间就变小了！举例来说， WWW 服务器软件的达成进程为httpd 这支程序， 而默认情况下， httpd 仅能在/var/www/ 这个目录底下存取文件，如果httpd 这个进程想要到其他目录去存取数据时， 除了规则设定要开放外，目标目录也得要设成httpd 可读取的模式(type) 才行！限制非常多！ 所以，即使不小心httpd 被cracker 取得了控制权，他也无权浏览/etc/shadow 等重要的配置文件喔！
-2、SELinux 的运作模式
-	一定要首先理解这句话，SELinux 是透过MAC 的方式来控管进程，他控制的主体是进程，而目标则是该进程能否读取的『文件资源』！首先看一下这些概念：
-	1-主体(Subject)：
-		SELinux 主要想要管理的就是进程，因此你可以将『主体』跟谈到的process 划上等号；
- 	2-目标(Object)：
-		主体进程能否存取的『目标资源』一般就是文件系统。因此这个目标项目可以等文件系统划上等号；
-  3-政策(Policy)：
-		由于进程与文件数量庞大，因此SELinux 会依据某些服务来制订基本的存取安全性政策。这些政策内还会有详细的规则(rule) 来指定不同的服务开放某些资源的存取与否。在目前的CentOS 7.x 里面仅有提供三个主要的政策，分别是：
-			o targeted：针对网络服务限制较多，针对本机限制较少，是预设的政策；
-			o minimum：由target 修订而来，仅针对选择的进程来保护！
-			o mls：完整的SELinux 限制，限制方面较为严格。
-			建议使用预设的targeted 政策即可。
-	4-安全性本文(security context)：
-		我们刚刚谈到了主体、目标与政策面，但是主体能不能存取目标除了政策指定之外，主体与目标的安全性本文必须一致才能够顺利存取。这个安全性本文(security context) 有点类似文件系统的rwx。安全性本文的内容与设定是非常重要的！ 如果设定错误，你的某些服务(主体进程)就无法存取文件系统(目标资源)，就会一直出现『权限不符』的错误讯息了！
-	主体』如何取得『目标』的资源访问权限：
-		(1)主体进程必须要通过SELinux 政策内的规则放行后，就可以与目标资源进行安全性本文的比对
-		(2)若比对失败则无法存取目标，若比对成功则可以开始存取目标。
-		(3)最终能否存取目标还是与文件系统的rwx权限设定有关
-3、安全性本文
-	安全性本文存在于主体进程中与目标文件资源中。进程在内存内，所以安全性本文可以存入是没问题。文件的安全性本文是记录在文件的inode 内，主体进程想要读取目标文件资源时，同样需要读取inode ， 这 inode 内就可以比对安全性本文以及rwx等权限值是否正确，而给予适当的读取权限依据。
-		# 先来观察一下 root 家目录底下的『文件的 SELinux 相关信息』，需要已经启动SELinux
-		$ ls -Z
-			-rw-------. root root system_u:object_r:admin_home_t:s0 anaconda-ks.cfg
-			-rw-r--r--. root root system_u:object_r:admin_home_t:s0 initial-setup-ks.cfg
-	安全性本文主要用冒号分为三个字段，这三个字段的意义为：
-		Identify:role:type
-		身份识别:角色:类型
-	这三个字段的意义仔细的说明一下吧：
- 		身份识别(Identify)：
-		相当于账号方面的身份识别！主要的身份识别常见有底下几种常见的类型：
-			o unconfined_u：不受限的用户，也就是说，该文件来自于不受限的进程所产生的！一般来说，我们使用可登入账号来取得bash 之后， 预设的bash 环境是不受SELinux 管制的～因为bash 并不是什么特别的网络服务！因此，在这个不受SELinux 所限制的bash 进程所产生的文件，其身份识别大多就是unconfined_u 这个『不受限』用户！
-			o system_u：系统用户，大部分就是系统自己产生的文件啰！
-		基本上，如果是系统或软件本身所提供的文件，大多就是system_u 这个身份名称，而如果是我们用户透过bash 自己建立的文件，大多则是不受限的unconfined_u 身份～如果是网络服务所产生的文件，或者是系统服务运作过程产生的文件，则大部分的识别就会是system_u ！
- 		角色(Role)：
-		透过角色字段，我们可以知道这个资料是属于进程、文件资源还是代表使用者。一般的角色有：
-			o object_r：代表的是文件或目录等文件资源，这应该是最常见的；
-			o system_r：代表的就是进程！不过，一般使用者也会被指定成为system_r！
-			你也会发现角色的字段最后面使用『 _r 』来结尾！因为是role 的意思嘛！
-		类型(Type) (最重要！)：
-		在预设的 targeted 政策中， Identify 与Role 字段基本上是不重要的！重要的在于这个类型(type) 字段！基本上，一个主体进程能不能读取到这个文件资源，与类型字段有关！而类型字段在文件与进程的定义不太相同，分别是：
-			o type：在文件资源(Object) 上面称为类型(Type)；
-			o domain：在主体进程(Subject) 则称为领域(domain) 了！
-		domain 需要与type 搭配，则该进程才能够顺利的读取文件资源啦！
-4、进程与文件SELinux type 字段的相关性
-	系统中的进程在SELinux 底下的安全本文：
-		# 观察一下系统『进程的 SELinux 相关信息』
-			$ ps -eZ
-			LABEL 							PID 		TTY 	TIME 		CMD
-			system_u:system_r:init_t:s0 	1 			? 		00:00:03 	systemd
-			system_u:system_r:kernel_t:s0 	2 			? 		00:00:00 	kthreadd
-			system_u:system_r:kernel_t:s0 	3 			? 		00:00:00 	ksoftirqd/0
-			.....(中间省略).....
-			unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 31513 ? 00:00:00 sshd
-			unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 31535 pts/0 00:00:00 bash
-			# 基本上进程主要就分为两大类，一种是系统有受限的 system_u:system_r，另一种则可能是用户自己的，
-			# 比较不受限的进程 (通常是本机用户自己执行的程序)，亦即是 unconfined_u:unconfined_r 这两种！
-	基本上，这些对应资料在targeted 政策下的对应如下：
-		unconfined_u unconfined_r
-			一般可登入使用者的进程！比较没有受限的进程之意！大多数都是用户已经顺利登入系统 (不论是网络还是本机登入来取得可用的 shell) 后， 所用来操作系统的进程！如 bash, X window 相关软件等。
-		system_u system_r
-			由于为系统账号，因此是非交谈式的系统运作进程，大多数的系统进程均是这种类型！
-	如上所述，在预设的target 政策下，其实最重要的字段是类型字段(type)， 主体与目标之间是否具有可以读写的权限，与进程的domain 及文件的type 有关！这两者的关系我们可以使用crond以及他的配置文件来说明！ 亦即是 /usr/sbin/crond, /etc/crontab, /etc/cron.d 等文件来说明。首先，看看这几个的安全性本文内容：
-		# 1. 先看看 crond 这个『进程』的安全本文内容：
-			$ ps -eZ | grep cron
-				system_u:system_r:crond_t:s0-s0:c0.c1023 1338 ? 00:00:01 crond
-				system_u:system_r:crond_t:s0-s0:c0.c1023 1340 ? 00:00:00 atd
-				# 这个安全本文的类型名称为 crond_t 格式！
-		# 2. 执行档、配置文件等等的安全本文内容
-			$ ll -Zd /usr/sbin/crond /etc/crontab /etc/cron.d
-				drwxr-xr-x. root root system_u:object_r:system_cron_spool_t:s0 /etc/cron.d
-				-rw-r--r--. root root system_u:object_r:system_cron_spool_t:s0 /etc/crontab
-				-rwxr-xr-x. root root system_u:object_r:crond_exec_t:s0 /usr/sbin/crond
-	当我们执行/usr/sbin/crond 之后，这个程序变成的进程的domain 类型会是crond_t,而这个crond_t 能够读取的配置文件则为system_cron_spool_t 这种的类型。因此不论/etc/crontab, /etc/cron.d以及/var/spool/cron 都会是相关的SELinux 类型(/var/spool/cron 为user_cron_spool_t)。步骤如下：
-		1. 首先，我们触发一个可执行的目标文件，那就是具有crond_exec_t 这个类型的/usr/sbin/crond 文件；
-		2. 该文件的类型会让这个文件所造成的主体进程(Subject) 具有crond 这个领域(domain)， 我们的政策针对这个领域已经制定了许多规则，其中包括这个领域可以读取的目标资源类型；
-		3. 由于crond domain 被设定为可以读取system_cron_spool_t 这个类型的目标文件(Object)， 因此你的配置文件放到/etc/cron.d/ 目录下，就能够被crond 那支进程所读取了；
-		4. 但最终能不能读到正确的资料，还得要看rwx 是否符合Linux 权限的规范！
-	上述的流程告诉我们几个重点，第一个是政策内需要制订详细的domain/type 相关性；第二个是若文件的type 设定错误， 那么即使权限设定为 rwx 全开的777 ，该主体进程也无法读取目标文件资源！不过如此一来， 也就可以避免用户将他的家目录设定为 777 时所造成的权限困扰。
-	
+	4-SELinux 的运作模式
+		一定要首先理解这句话，SELinux 是透过MAC 的方式来控管进程，他控制的主体是进程，而目标则是该进程能否读取的『文件资源』！首先看一下这些概念：
+		1-主体(Subject)：
+			SELinux 主要想要管理的就是进程，因此你可以将『主体』跟谈到的process 划上等号；
+	 	2-目标(Object)：
+			主体进程能否存取的『目标资源』一般就是文件系统。因此这个目标项目可以等文件系统划上等号；
+	  3-政策(Policy)：
+			由于进程与文件数量庞大，因此SELinux 会依据某些服务来制订基本的存取安全性政策。这些政策内还会有详细的规则(rule) 来指定不同的服务开放某些资源的存取与否。在目前的CentOS 7.x 里面仅有提供三个主要的政策，分别是：
+				o targeted：针对网络服务限制较多，针对本机限制较少，是预设的政策；
+				o minimum：由target 修订而来，仅针对选择的进程来保护！
+				o mls：完整的SELinux 限制，限制方面较为严格。
+				建议使用预设的targeted 政策即可。
+		4-安全性本文(security context)：
+			我们刚刚谈到了主体、目标与政策面，但是主体能不能存取目标除了政策指定之外，主体与目标的安全性本文必须一致才能够顺利存取。这个安全性本文(security context) 有点类似文件系统的rwx。安全性本文的内容与设定是非常重要的！ 如果设定错误，你的某些服务(主体进程)就无法存取文件系统(目标资源)，就会一直出现『权限不符』的错误讯息了！
+		主体』如何取得『目标』的资源访问权限：
+			(1)主体进程必须要通过SELinux 政策内的规则放行后，就可以与目标资源进行安全性本文的比对
+			(2)若比对失败则无法存取目标，若比对成功则可以开始存取目标。
+			(3)最终能否存取目标还是与文件系统的rwx权限设定有关
+	5-安全性本文
+		安全性本文存在于主体进程中与目标文件资源中。进程在内存内，所以安全性本文可以存入是没问题。文件的安全性本文是记录在文件的inode 内，主体进程想要读取目标文件资源时，同样需要读取inode ， 这 inode 内就可以比对安全性本文以及rwx等权限值是否正确，而给予适当的读取权限依据。
+			# 先来观察一下 root 家目录底下的『文件的 SELinux 相关信息』，需要已经启动SELinux
+			$ ls -Z
+				-rw-------. root root system_u:object_r:admin_home_t:s0 anaconda-ks.cfg
+				-rw-r--r--. root root system_u:object_r:admin_home_t:s0 initial-setup-ks.cfg
+		安全性本文主要用冒号分为三个字段，这三个字段的意义为：
+			Identify:role:type
+			身份识别:角色:类型
+		这三个字段的意义仔细的说明一下吧：
+	 		身份识别(Identify)：
+			相当于账号方面的身份识别！主要的身份识别常见有底下几种常见的类型：
+				o unconfined_u：不受限的用户，也就是说，该文件来自于不受限的进程所产生的！一般来说，我们使用可登入账号来取得bash 之后， 预设的bash 环境是不受SELinux 管制的～因为bash 并不是什么特别的网络服务！因此，在这个不受SELinux 所限制的bash 进程所产生的文件，其身份识别大多就是unconfined_u 这个『不受限』用户！
+				o system_u：系统用户，大部分就是系统自己产生的文件啰！
+			基本上，如果是系统或软件本身所提供的文件，大多就是system_u 这个身份名称，而如果是我们用户透过bash 自己建立的文件，大多则是不受限的unconfined_u 身份～如果是网络服务所产生的文件，或者是系统服务运作过程产生的文件，则大部分的识别就会是system_u ！
+	 		角色(Role)：
+			透过角色字段，我们可以知道这个资料是属于进程、文件资源还是代表使用者。一般的角色有：
+				o object_r：代表的是文件或目录等文件资源，这应该是最常见的；
+				o system_r：代表的就是进程！不过，一般使用者也会被指定成为system_r！
+				你也会发现角色的字段最后面使用『 _r 』来结尾！因为是role 的意思嘛！
+			类型(Type) (最重要！)：
+			在预设的 targeted 政策中， Identify 与Role 字段基本上是不重要的！重要的在于这个类型(type) 字段！基本上，一个主体进程能不能读取到这个文件资源，与类型字段有关！而类型字段在文件与进程的定义不太相同，分别是：
+				o type：在文件资源(Object) 上面称为类型(Type)；
+				o domain：在主体进程(Subject) 则称为领域(domain) 了！
+			domain 需要与type 搭配，则该进程才能够顺利的读取文件资源啦！
+	6-进程与文件SELinux type 字段的相关性
+		系统中的进程在SELinux 底下的安全本文：
+			# 观察一下系统『进程的 SELinux 相关信息』
+				$ ps -eZ
+				LABEL 							PID 		TTY 	TIME 		CMD
+				system_u:system_r:init_t:s0 	1 			? 		00:00:03 	systemd
+				system_u:system_r:kernel_t:s0 	2 			? 		00:00:00 	kthreadd
+				system_u:system_r:kernel_t:s0 	3 			? 		00:00:00 	ksoftirqd/0
+				.....(中间省略).....
+				unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 31513 ? 00:00:00 sshd
+				unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 31535 pts/0 00:00:00 bash
+				# 基本上进程主要就分为两大类，一种是系统有受限的 system_u:system_r，另一种则可能是用户自己的，
+				# 比较不受限的进程 (通常是本机用户自己执行的程序)，亦即是 unconfined_u:unconfined_r 这两种！
+		基本上，这些对应资料在targeted 政策下的对应如下：
+			unconfined_u unconfined_r
+				一般可登入使用者的进程！比较没有受限的进程之意！大多数都是用户已经顺利登入系统 (不论是网络还是本机登入来取得可用的 shell) 后， 所用来操作系统的进程！如 bash, X window 相关软件等。
+			system_u system_r
+				由于为系统账号，因此是非交谈式的系统运作进程，大多数的系统进程均是这种类型！
+		如上所述，在预设的target 政策下，其实最重要的字段是类型字段(type)， 主体与目标之间是否具有可以读写的权限，与进程的domain 及文件的type 有关！这两者的关系我们可以使用crond以及他的配置文件来说明！ 亦即是 /usr/sbin/crond, /etc/crontab, /etc/cron.d 等文件来说明。首先，看看这几个的安全性本文内容：
+			# 1. 先看看 crond 这个『进程』的安全本文内容：
+				$ ps -eZ | grep cron
+					system_u:system_r:crond_t:s0-s0:c0.c1023 1338 ? 00:00:01 crond
+					system_u:system_r:crond_t:s0-s0:c0.c1023 1340 ? 00:00:00 atd
+					# 这个安全本文的类型名称为 crond_t 格式！
+			# 2. 执行档、配置文件等等的安全本文内容
+				$ ll -Zd /usr/sbin/crond /etc/crontab /etc/cron.d
+					drwxr-xr-x. root root system_u:object_r:system_cron_spool_t:s0 /etc/cron.d
+					-rw-r--r--. root root system_u:object_r:system_cron_spool_t:s0 /etc/crontab
+					-rwxr-xr-x. root root system_u:object_r:crond_exec_t:s0 /usr/sbin/crond
+		当我们执行/usr/sbin/crond 之后，这个程序变成的进程的domain 类型会是crond_t,而这个crond_t 能够读取的配置文件则为system_cron_spool_t 这种的类型。因此不论/etc/crontab, /etc/cron.d以及/var/spool/cron 都会是相关的SELinux 类型(/var/spool/cron 为user_cron_spool_t)。步骤如下：
+			1. 首先，我们触发一个可执行的目标文件，那就是具有crond_exec_t 这个类型的/usr/sbin/crond 文件；
+			2. 该文件的类型会让这个文件所造成的主体进程(Subject) 具有crond 这个领域(domain)， 我们的政策针对这个领域已经制定了许多规则，其中包括这个领域可以读取的目标资源类型；
+			3. 由于crond domain 被设定为可以读取system_cron_spool_t 这个类型的目标文件(Object)， 因此你的配置文件放到/etc/cron.d/ 目录下，就能够被crond 那支进程所读取了；
+			4. 但最终能不能读到正确的资料，还得要看rwx 是否符合Linux 权限的规范！
+		上述的流程告诉我们几个重点，第一个是政策内需要制订详细的domain/type 相关性；第二个是若文件的type 设定错误， 那么即使权限设定为 rwx 全开的777 ，该主体进程也无法读取目标文件资源！不过如此一来， 也就可以避免用户将他的家目录设定为 777 时所造成的权限困扰。
+2、SELinux 三种模式的启动、关闭与观察
+	1-并非所有的 Linux distributions 都支持SELinux 的，所以你必须要先观察一下你的系统版本！这里介绍的 CentOS 7.x 本身就有支持SELinux！不需要自行编译SELinux 到Linux 核心中！ 目前 SELinux 依据启动与否，共有三种模式，分别如下：
+	 enforcing：强制模式，代表SELinux 运作中，且已经正确的开始限制domain/type 了；
+	 permissive：宽容模式：代表SELinux 运作中，不过仅会有警告讯息并不会实际限制domain/type 的存取。这种模式可以运来作为SELinux 的debug 之用；
+	 disabled：关闭，SELinux 并没有实际运作。
+	2-怎么知道目前的 SELinux 模式：
+		$getenforce
+			Enforcing
+	SELinux 的政策(Policy) ？这时可以使用sestatus 来观察：
+		$ sestatus [-vb]
+			选项与参数：
+			-v ：检查列于 /etc/sestatus.conf 内的文件与进程的安全性本文内容；
+			-b ：将目前政策的规则布尔值列出，亦即某些规则 (rule) 是否要启动 (0/1) 之意；
+		范例一：列出目前的 SELinux 使用哪个政策 (Policy)？
+		$ sestatus
+			SELinux status: enabled 					<==是否启动 SELinux
+			SELinuxfs mount: /sys/fs/selinux 			<==SELinux 的相关文件数据挂载点
+			SELinux root directory: /etc/selinux 		<==SELinux 的根目录所在
+			Loaded policy name: targeted 				<==目前的政策为何？
+			Current mode: enforcing 					<==目前的模式
+			Mode from config file: enforcing 			<==目前配置文件内规范的 SELinux 模式
+			Policy MLS status: enabled 					<==是否含有 MLS 的模式机制
+			Policy deny_unknown status: allowed 		<==是否预设抵挡未知的主体进程
+			Max kernel policy version: 28
+		如上所示，目前是启动的，而且是Enforcing 模式，而由配置文件查询得知亦为Enforcing 模式。此外，目前的预设政策为targeted 这一个。SELinux 的配置文件其实就是 /etc/selinux/config 这个文件！我们来看看内容：
+		$ vim /etc/selinux/config
+			SELINUX=enforcing <==调整 enforcing|disabled|permissive
+			SELINUXTYPE=targeted <==目前仅有 targeted, mls, minimum 三种政策
+	3-SELinux 的启动与关闭
+		1）上面是默认的政策与启动的模式！你要注意的是，如果改变了政策则需要重新启动；如果由enforcing或permissive 改成disabled ，或由disabled 改成其他两个，那也必须要重新启动。这是因为SELinux是整合到核心里面去的，你只可以在 SELinux 运作下切换强制(enforcing) 或宽容(permissive)模式，不能够直接关闭SELinux 的！ 
+		2）不过你要注意的是，如果从disable 转到启动SELinux 的模式时， 由于系统必须要针对文件写入安全性本文的信息，因此开机过程会花费不少时间在等待重新写入SELinux 安全性本文(有时也称为SELinux Label) ，而且在写完之后还得要再次的重新启动一次！你必须要等待很长一段时间！ 等到下次开机成功后，再使用getenforce 或 sestatus 来观察看看有否成功的启动到 Enforcing 的模式啰！
+		3）如果你已经在 Enforcing 的模式，但是可能由于一些设定的问题导致SELinux 让某些服务无法正常的运作， 此时你可以将 Enforcing 的模式改为宽容(permissive) 的模式，让SELinux 只会警告无法顺利联机的讯息， 而不是直接抵挡主体进程的读取权限。让 SELinux 模式在enforcing 与permissive 之间切换的方法为：
+			$ setenforce [0|1]
+				选项与参数：
+				0 ：转成 permissive 宽容模式；
+				1 ：转成 Enforcing 强制模式
+			不过请注意， setenforce 无法在Disabled 的模式底下进行模式的切换
+		注意：在某些特殊的情况底下，你从Disabled 切换成Enforcing 之后，竟然有一堆服务无法顺利启动，都会跟你说在/lib/xxx 里面的数据没有权限读取，所以启动失败。这大多是由于在重新写入SELinux type(Relabel) 出错之故，使用Permissive 就没有这个错误。那如何处理呢？最简单的方法就是在Permissive 的状态下，使用『restorecon -Rv / 』重新还原所有SELinux 的类型，就能够处理这个错误！
+3、SELinux 政策内的规则管理
+	我们知道 SELinux 的三种模式是会影响到主体进程的放行与否。如果是进入Enforcing 模式，那么接着下来会影响到主体进程的，当然就是第二关：『target 政策内的各项规则(rules) 』了！ 好了，那么我们怎么知道目前这个政策里面到底有多少会影响到主体进程的规则呢？
+	1-SELinux 各个规则的布尔值查询getsebool
+		如果想要查询系统上面全部规则的启动与否 (on/off，亦即布尔值)，很简单的透过sestatus -b 或getsebool -a 均可！
+		$ getsebool [-a] [规则的名称]
+			选项与参数：
+			-a ：列出目前系统上面的所有 SELinux 规则的布尔值为开启或关闭值
+		范例一：查询本系统内所有的布尔值设定状况
+		$ getsebool -a
+			abrt_anon_write --> off
+			abrt_handle_event --> off
+			....(中间省略)....
+			cron_can_relabel --> off # 这个跟 cornd 比较有关！
+			cron_userdomain_transition --> on
+			....(中间省略)....
+			httpd_enable_homedirs --> off # 这当然就是跟网页，亦即 http 有关的啰！
+			....(底下省略)....
+			# 每个规则后面都列出现在是允许放行还是不许放行的布尔值喔！
+	2-SELinux 各个规则规范的主体进程能够读取的文件SELinux type 查询seinfo, sesearch
 		
+		
+
+			
 		
 		
 		
