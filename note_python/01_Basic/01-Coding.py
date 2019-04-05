@@ -1,34 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# wangxm
+# Author:Wang Xueming
 # 第一行的另一种写法#!/usr/bin/python  这种写法局限了python的安装位置
 # 第二行显示的告诉python解释器，用什么编码来执行源代码，如果包含中文python2需要，python3不需要
-################################################################
+
 print("hello world")
-#################################################################
-'''
-变量定义的规则：
-1-变量名只能是 字母、数字或下划线的任意组合
-2-变量名的第一个字符不能是数字
-3-以下关键字不能声明为变量名
-['and', 'as', 'assert', 'break', 'class', 'continue', 'def',
- 'del', 'elif', 'else', 'except', 'exec', 'finally', 'for', 
- 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'not', 
- 'or', 'pass', 'print', 'raise', 'return', 'try', 'while', 'with', 'yield']
-'''
-# 定义变量，等号可以有空格
-name = "Wang Xueming"
-name2=name           # 变量指向值，所以下面改变name的值，name2的值并未改变
-print("My name is ", name, "Ha Ha")
-name="Wang Xiaoming"
-print(name, name2)
-######################################################################
+
 '''
 python2解释器在加载 .py 文件中的代码时，会对内容进行编码（默认ascill）
     ASCII（American Standard Code for Information Interchange，美国标准信息交换代码）
     是基于拉丁字母的一套电脑编码系统，主要用于显示现代英语和其他西欧语言，其最多只能
     用 8 位来表示（一个字节），即：2**8 = 256-1，所以，ASCII码最多只能表示 255 个符号
-    
+
     关于中文
         为了处理汉字，程序员设计了用于简体中文的GB2312和用于繁体中文的big5。
         GB2312(1980年)一共收录了7445个字符，包括6763个汉字和682个其它符号。汉字区的内
@@ -66,87 +49,19 @@ PS:
     so utf-16就是现在最常用的unicode版本， 不过在文件里存的还是utf-8，因为utf8省空间
 3.在py3中encode,在转码的同时还会把string 变成bytes类型，
     decode在解码的同时还会把bytes变回string  
-    
+
 编码问题博客：
 http://www.cnblogs.com/yuanchenqi/articles/5956943.html
 http://www.diveintopython3.net/strings.html 
-理解图片：codeFlow.PNG
+理解图片：01-Codeflow.PNG
 
 '''
 chn = "中文"
 print(chn)
 '''
-（不添加二行内容）使用python2执行报错：
+（不添加第二行内容）使用python2执行报错：
     C:\Python27\python.exe F:/Notes/note_python/03-variable.py
     File "F:/Notes/note_python/03-variable.py", line 4
-    SyntaxError: Non-ASCII character '\xe7' in file F:/Notes/note_python/03-variable.py on line 4, 
+    SyntaxError: Non-ASCII character '\xe7' in file F:/Notes/note_python/01-Coding.py on line 4, 
     but no encoding declared; see http://python.org/dev/peps/pep-0263/ for details
 '''
-############################################################################################
-''' 
-    单行注释：# 被注释内容
-　　多行注释：""" 被注释内容 """  (双引号或者多引号)
-
-    三个成对的双引号或者单引号还可以作为多行打印来使用
-    单行打印使用双引号或者单引号都可以，效果相同，与shell有所区别
-    使用单引号还是双引号取决于内容包含双引号还是单引号，不包含均可以使用
-'''
-mulitLine = """开始：
-被注释内容 
-多行打印
-"""
-# 注意加号后跟进的引号需要和加号在同一行,否则会报错
-mulitLine2 = """开始：
-被注释内容 """ + """--------插入内容""" + '''
-多行打印
-'''
-print(mulitLine)
-print(mulitLine2)
-###################################################################################
-# 用户输入：
-var1 = input("变量一：")
-var2 = input()
-# python2 raw_input() --> python3 input()
-# python2 中也包含input，但是没什么用，需要输入“变量:值”的形式
-var3 = input(""" 输入变量三
-请输入：""")
-print(type(var3)) # 输入的默认的是字符串<class 'str'>
-var3 = int(var3)  # Python是强类型语言，需要强转类型
-print(type(var3))
-print(var1, "---", var2, "---", var3)
-info = """
--------info--------
-var1:%s
-var2:%s
-var3:%d
--------end---------
-""" % (var1, var2, var3)
-print(info)
-
-info2 = """
--------info2--------
-var1:{var1}
-var2:{var2}
-var3:{var3} === {_var2}
--------end---------
-""" .format(var1=var1,
-            var2=var2,
-            _var2=var2,
-            var3=var3)
-print(info2)
-
-info3 = """
--------info3--------
-var1:{0}
-var2:{1}
-var3:{2} =============== {1}
--------end---------
-""" .format(var1, var2, var3)
-print(info3)
-# 注意以上三种格式化方式同样适用于单行字符串，单行字符串和多行字符串是相同的
-#####################################################################################
-# 输入密文需要导入 import getpass 模块
-# import getpass             # 在命令行运行有效，在pycharm中不好用
-# passwd = getpass.getpass("password:")
-# print(passwd)
-
