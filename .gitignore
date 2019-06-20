@@ -51,3 +51,5 @@ classes/
 .DS_Store?
 velocity.log*
 /note_python/.idea/
+note_python/__pycache__/
+note_java/disruptor/.idea
