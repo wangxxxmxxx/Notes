@@ -1,5 +1,6 @@
-package com.eussi;
+package com.eussi.publish;
 
+import com.eussi.base.DataEvent;
 import com.lmax.disruptor.EventFactory;
 
 /**

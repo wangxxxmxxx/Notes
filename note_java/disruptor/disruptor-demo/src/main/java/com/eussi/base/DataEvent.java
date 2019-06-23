@@ -1,4 +1,4 @@
-package com.eussi;
+package com.eussi.base;
 
 /**
  * Created by wangxueming on 2019/6/20.

@@ -1,4 +1,8 @@
-import com.eussi.*;
+import com.eussi.base.Data;
+import com.eussi.base.DataEvent;
+import com.eussi.publish.DataEventFactory;
+import com.eussi.publish.DataEventTranslator;
+import com.eussi.publish.DataEventTranslatorWithIdAndValue;
 import com.lmax.disruptor.RingBuffer;
 
 import java.util.concurrent.CountDownLatch;
@@ -6,19 +10,7 @@ import java.util.concurrent.CountDownLatch;
 /**
  * Created by wangxueming on 2019/6/20.
  */
-public class Test {
-
-    /**
-     * ringbuffer初始化测试
-     */
-    @org.junit.Test
-    public void test() {
-        RingBuffer<DataEvent> ringBuffer =
-                RingBuffer.createSingleProducer(new DataEventFactory(), 1024);
-        DataEvent dataEvent = ringBuffer.get(0);
-        System.out.println("Event = " + dataEvent);
-        System.out.println("Data = " + dataEvent.getData());
-    }
+public class _02_TestPublish {
 
     /**
      * ringbuffer发布事件
@@ -119,15 +111,16 @@ public class Test {
     }
 
     /**
-     * ringbuffer多线程环境使用单线程生产者发布事件
+     * 不安全。。。。
+     * ringbuffer多线程环境使用单线程生产者发布事件，会出现覆盖情况
      */
     @org.junit.Test
     public void test6() {
         final RingBuffer<DataEvent> ringBuffer =
                 //这里是单线程模式!!!
                 RingBuffer.createSingleProducer(new DataEventFactory(), 1024);
-        final CountDownLatch latch = new CountDownLatch(10);
-        for(int i=0;i<10;i++){
+        final CountDownLatch latch = new CountDownLatch(100);
+        for(int i=0;i<100;i++){
             final int index = i;
             //开启多个线程发布事件。
             new Thread(new Runnable() {
@@ -148,7 +141,7 @@ public class Test {
         try {
             latch.await();
             //最后观察下发布的时间。
-            for(int i=0;i<11;i++){
+            for(int i=0;i<101;i++){
                 DataEvent event = ringBuffer.get(i);
                 System.out.println(event.getData());
             }
