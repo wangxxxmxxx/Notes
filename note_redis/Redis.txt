@@ -62,6 +62,9 @@ redis笔记：
 			./redis-cli shutdown
 	4-连接
 		./redis-cli [-h xxx.xxx.xxx.xxx -p xxx]		#默认端口6379
+			默认情况下，连接redis只能通过127.0.0.1连接，如需要其他地址，或者远程连接，修改配置文件：
+				protected-mode no
+				#bind 127.0.0.1			#绑定的网卡
 	5-其他命令说明
 		Redis-server 启动服务
 		Redis-cli 访问到redis的控制台
@@ -139,6 +142,7 @@ redis笔记：
 			strlen  key  					获得key对应的value的长度
 			mget  key [key1 ...]  			同时获得多个key的value，减少网络的传输
 			mset key value [key value ...] 	同时设置多个key，value
+			setnx							「SET if Not eXists」的缩写，也就是只有不存在的时候才设置，可以利用它来实现锁的效果
 	2-列表类型
 		1. list, 可以存储一个有序的字符串列表
 			LPUSH/RPUSH： 从左边或者右边push数据：LPUSH/RPUSH key value value ...
@@ -168,6 +172,82 @@ redis笔记：
 			lrange key start stop   索引可以是负数,-1表示最右边的第一个元素，lrange key 0 -1 # 展示列表所有元素
 			lrem key count value	删除列表中count个值为value的元素
 			lset key index value	设置列表中index位置的值为value
+	3-散列类型
+		1. 结构为：hash key value  不支持数据类型的嵌套
+			比较适合存储对象：
+				person
+					age  18
+					sex   男
+					name li
+					..
+		2. 添加与获取
+			hset key field value
+			hget key filed
+			如：
+				127.0.0.1:6379> hset person age 18
+				(integer) 1
+				127.0.0.1:6379> hset person sex man
+				(integer) 1
+				127.0.0.1:6379> hset person name li
+				(integer) 1
+				127.0.0.1:6379> hget person name
+				"li"
+		3. 其他操作
+			hmset key filed value [filed value …]  一次性设置多个属性值
+			hmget key field field …  一次性获得多个值
+			hgetall key  获得hash的所有信息，包括key和value
+			hexists key field 判断字段是否存在。 存在返回1. 不存在返回0
+			hincryby
+			hsetnx
+			hdel key field [field …] 删除一个或者多个字段
+	4-集合类型
+		1. set 跟list 不一样的点。 集合类型不能存在重复的数据。而且是无序的
+		2. 添加与删除
+			sadd key member [member ...] 	增加数据； 如果value已经存在，则会忽略存在的值，并且返回成功加入的元素的数量
+			srem key member  				删除元素
+			smembers key 					获得所有数据
+		3. 其他操作
+			sdiff key key ...  	对多个集合执行差集运算，差集来自于第一个key
+			sunion key key ...	对多个集合执行并集操作, 同时存在在两个集合里的所有值，不存在的集合视为空集
+	5-有序集合
+		zadd key score member
+		zrange key start stop [withscores] 去获得元素。 withscores是可以获得元素的分数
+			如果两个元素的score是相同的话，那么根据(0<9<A<Z<a<z) 方式从小到大
+7）redis的事务处理
+	1-语法
+		MULTI 	开启事务
+		EXEC 	执行事务
+		DISCARD	取消当前事务
+	2-注意，运行时出错的事务不回滚：
+		127.0.0.1:6379> multi
+		OK
+		127.0.0.1:6379> set aa hello
+		QUEUED
+		127.0.0.1:6379> incr aa
+		QUEUED
+		127.0.0.1:6379> set bb 1
+		QUEUED
+		127.0.0.1:6379> exec
+		1) OK
+		2) (error) ERR value is not an integer or out of range
+		3) OK
+		127.0.0.1:6379> get aa
+		"hello"
+8）过期时间
+	expire key seconds 设置过期时间
+	ttl key 			获得key的过期时间，随时间变化改变
+9）发布订阅（使用较少）
+	publish channel message
+	subscribe channel [ ... ]
+10）redis实现分布式锁
+	实现：
+		数据库可以做 activemq
+		缓存 -redis  setnx
+		zookeeper
+
+
+
+
 
 	
 
