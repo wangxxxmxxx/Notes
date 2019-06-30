@@ -1,0 +1,184 @@
+redis笔记：
+1）redis的优势
+	1-数据存储结构丰富：
+		1.	字符类型
+		2.	散列类型
+		3.	列表类型
+		4.	集合类型
+		5.	有序集合
+	2-功能
+		1.	可以为每个key设置超时时间；
+		2.	可以通过列表类型来实现分布式队列的操作
+		3.	支持发布订阅的消息模式
+	3-简单
+		1.	提供了很多命令与redis进行交互
+2）redis的应用场景
+	1.	数据缓存（商品数据、新闻、热点数据）
+	2.	单点登录
+	3.	秒杀、抢购
+	4.	网站访问排名
+	5.	应用的模块开发
+3）安装下载及命令简介：
+	1-下载地址：
+		http://download.redis.io/releases/
+		http://download.redis.io/releases/redis-3.2.8.tar.gz  #下载3.2.8版本
+	2-安装：
+		解压：
+			tar -zxvf redis-3.2.8.tar.gz 
+		编译：
+			cd redis-3.2.8/
+			make
+				报错：Redis make[1]: *** [adlist.o] Error 127
+					yum install -y gcc-c++
+			make distclean	#注意先清理再编译
+			make
+			make test #可选
+				报错：You need tcl 8.5 or newer in order to run the Redis test
+					wget http://downloads.sourceforge.net/tcl/tcl8.6.1-src.tar.gz 
+					tar xzvf tcl8.6.1-src.tar.gz  -C /usr/local/
+					cd  /usr/local/tcl8.6.1/unix/
+					./configure 
+					make
+					make install
+			make test
+			make install #默认安装在src目录下，可以选择安装另一目录：make install PREFIX=/root/redis 直接执行，执行make install后再执行也可以
+				\o/ All tests passed without errors!
+
+				Cleanup: may take some time... OK
+				make[1]: Leaving directory `/root/redis-3.2.8/src'
+	3-启停
+		安装源码后，如果安装在另外一个目录，把配置文件复制一份，源码目录可以删除了，需要的文件如下：
+		[root@app2 ~]# find redis/ -type f
+			redis/bin/redis-server
+			redis/bin/redis-benchmark
+			redis/bin/redis-cli
+			redis/bin/redis-check-rdb
+			redis/bin/redis-check-aof
+			redis/bin/dump.rdb
+			redis/redis.conf
+		启动命令：
+			./redis-server ../redis.conf	#默认前台启动，后台启动，修改配置文件daemonize属性为yes
+		关闭命令：
+			./redis-cli shutdown
+	4-连接
+		./redis-cli [-h xxx.xxx.xxx.xxx -p xxx]		#默认端口6379
+	5-其他命令说明
+		Redis-server 启动服务
+		Redis-cli 访问到redis的控制台
+		redis-benchmark 性能测试的工具
+		redis-check-aof aof文件进行检测的工具
+		redis-check-dump  rdb文件检查工具
+		redis-sentinel  sentinel 服务器配置
+4）多数据库支持
+	1-默认支持16个数据库，具体看配置文件说明：
+		# Set the number of databases. The default database is DB 0, you can select
+		# a different one on a per-connection basis using SELECT <dbid> where
+		# dbid is a number between 0 and 'databases'-1
+		databases 16
+	2-说明：
+		redis分数据库，可以理解为一个命名空间
+		跟关系型数据库不一样的点：
+			1.	redis不支持自定义数据库名词
+			2.	每个数据库不能单独设置授权
+			3.	每个数据库之间并不是完全隔离的。 可以通过flushall命令清空redis实例面的所有数据库中的数据
+	3-通过select dbid 去选择不同的数据库命名空间 。 默认情况下：dbid的取值范围默认是0 -15
+		[root@app2 bin]# ./redis-cli 
+		127.0.0.1:6379> select 7
+		OK
+		127.0.0.1:6379[7]> select 10
+		OK
+		127.0.0.1:6379[10]> select 16
+		(error) ERR invalid DB index
+		127.0.0.1:6379[10]>
+5）简单使用入门
+	1-获得一个符合匹配规则的键名列表：keys pattern  [? | * | []], 注意后面表达式越不清晰越消耗性能
+		[root@app2 bin]# ./redis-cli 
+		127.0.0.1:6379> SET runoob1 redis
+		OK
+		127.0.0.1:6379> SET runoob2 mysql
+		OK
+		127.0.0.1:6379> SET runoob3 mongodb
+		OK
+		127.0.0.1:6379> keys runoob*
+		1) "runoob3"
+		2) "runoob2"
+		3) "runoob1"
+	2-判断一个键是否存在：exists key 
+	3-去获得这个key的数据结构类型： type key 
+6）数据结构的使用
+	1-字符类型
+		1. 一个字符类型的key默认存储的最大容量是512M
+		2. 赋值和取值
+			SET key value
+			GET key
+		3. 递增数字:incr key
+			递增为原子操作
+				127.0.0.1:6379> set age 10
+				OK
+				127.0.0.1:6379> incr age
+				(integer) 11
+				127.0.0.1:6379> incr age
+				(integer) 12
+				127.0.0.1:6379> incr age
+				(integer) 13
+			错误的操作，程序中递增，线程不安全：
+				int value= get key;
+				value =value +1;
+				set key value;
+			应用：
+				短信重发机制：sms:limit:mobile expire 
+					对某电话号码进行次数限制，并设置过期时间，防止过期时间内重发次数超过该数量
+		4. key的设计
+			命名不建议太长，格式可以为：
+				对象类型:对象id:对象属性:对象子属性
+			建议对key进行分类，同步在自己公司的wiki中统一管理
+		5. 其他操作：
+			incryby key increment  			递增指定的整数,如：incryby age 6
+			decr key   						原子递减
+			append key value   				向指定的key追加字符串
+			strlen  key  					获得key对应的value的长度
+			mget  key [key1 ...]  			同时获得多个key的value，减少网络的传输
+			mset key value [key value ...] 	同时设置多个key，value
+	2-列表类型
+		1. list, 可以存储一个有序的字符串列表
+			LPUSH/RPUSH： 从左边或者右边push数据：LPUSH/RPUSH key value value ...
+			LPOP/RPOP : 从左边或者右边取数据
+				127.0.0.1:6379> lpush test 11
+				(integer) 1
+				127.0.0.1:6379> lpush test 12
+				(integer) 2
+				127.0.0.1:6379> lpush test 13
+				(integer) 3
+				127.0.0.1:6379> rpush test 10
+				(integer) 4
+				127.0.0.1:6379> lpop test
+				"13"
+				127.0.0.1:6379> lpop test
+				"12"
+				127.0.0.1:6379> lpop test
+				"11"
+				127.0.0.1:6379> lpop test
+				"10"
+				127.0.0.1:6379> lpop test
+				(nil)
+		2. 应用场景
+			可以用来做分布式消息队列
+		3. 其他操作：
+			llen key  				获得列表的长度
+			lrange key start stop   索引可以是负数,-1表示最右边的第一个元素，lrange key 0 -1 # 展示列表所有元素
+			lrem key count value	删除列表中count个值为value的元素
+			lset key index value	设置列表中index位置的值为value
+
+	
+
+
+
+			
+
+
+
+
+
+
+
+
