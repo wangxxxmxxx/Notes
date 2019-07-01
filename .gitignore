@@ -53,3 +53,5 @@ velocity.log*
 /note_python/.idea/
 note_python/__pycache__/
 note_java/disruptor/.idea
+note_redis/redisdemo/.idea
+note_redis/redisdemo/target
