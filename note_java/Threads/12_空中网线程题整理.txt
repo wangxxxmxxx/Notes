@@ -298,7 +298,7 @@
 					return _instance;
 				}
 
-				//private ArrayList keys = new ArrayList();
+				//private ArrayList keys = new ArrayList();  //线程不安全，迭代过程中不能操作集合
 				private CopyOnWriteArrayList keys = new CopyOnWriteArrayList();
 				public void doSome(Object key, String value) {
 					Object o = key;
@@ -307,12 +307,12 @@
 					}else{
 
 						for(Iterator iter=keys.iterator();iter.hasNext();){
-							try {
-								Thread.sleep(20);
-							} catch (InterruptedException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
+							//try {
+							//	Thread.sleep(20);
+							//} catch (InterruptedException e) {
+							//	// TODO Auto-generated catch block
+							//	e.printStackTrace();
+							//}
 							Object oo = iter.next();
 							if(oo.equals(o)){
 								o = oo;
