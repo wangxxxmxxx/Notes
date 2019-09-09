@@ -18,7 +18,7 @@ int main(void) {
 
     //创建套接字
     sd = socket(PF_INET, SOCK_DGRAM, 0);
-    printf("socket描述符:%d.\n");
+    printf("socket描述符:%d.\n", sd);
 
     //将本地地址和端口绑定到套接字
     memset(&serverAddr, 0, sizeof(serverAddr));
