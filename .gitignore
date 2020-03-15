@@ -50,8 +50,8 @@ classes/
 .DS_Store
 .DS_Store?
 velocity.log*
-/note_python/.idea/
-note_python/__pycache__/
-note_java/disruptor/.idea
-note_redis/redisdemo/.idea
-note_redis/redisdemo/target
+
+**/__pycache__/**
+**/.idea/**
+**/.idea/**
+**/target/**

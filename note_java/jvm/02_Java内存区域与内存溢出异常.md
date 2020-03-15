@@ -1,4 +1,7 @@
+Java与C++之间有一堵由内存动态分配和垃圾收集技术所围成的“高墙”，墙外面的人想进去，墙里面的人却想出来。
+
 # 概述
+
 对C和C++的开发人员来说，在内存管理领域，他们既拥有每一个对象的“所有权”，也担负着每一个对象生命开始到终结的维护责任。
 
 对java程序猿来说，在虚拟机自动内存管理机制的帮助下，不再需要为每一个new操作去写配对的delete/free代码，不容易出现内存泄露和内存溢出的问题。但是也出现问题：如果不理解虚拟机是怎么使用内存的，排查错误将会是一项非常艰难的工作。
@@ -46,7 +49,7 @@ Java虚拟机在执行Java程序的过程中会把它所管理的内存划分为
 2. 用于存储已经被虚拟机加载的类信息、常量、静态变量、即时编译器编译后的代码等数据
 3. Java虚拟机规范将其描述为堆的一个逻辑部分，但是它有一个别名叫做Non-Heap，目的是与堆区分开来
 4. 习惯HotSpot开发部署人员更愿意把方法区称为永久代（Permanent Generation），本质上并不等价，只是HotSpot团队选择把GC分代收集扩展至方法区，以使垃圾收集像管理堆一样管理这部分内存，省去编写方法区内存管理工作，其他虚拟机（J9）不存在永久代概念，实现方法区不受虚拟机规范约束
-5. 使用永久代因为通过-XX:MaxPermSize（jdk8已经取消）限制的上限，更容易内存溢出。极少数方法（如String.intern()）会因这个导致在不同虚拟机下有不同表现。JDK1.7的HotSpot中，已经把原本放在永久代的字符串常量池移出
+5. 使用永久代因为通过-XX:MaxPermSize（**jdk8已经取消**）限制的上限，更容易内存溢出。极少数方法（如String.intern()）会因这个导致在不同虚拟机下有不同表现。**JDK1.7的HotSpot中，已经把原本放在永久代的字符串常量池移出**
 6. Java虚拟机规范对方法区限制十分宽松，除了和堆一样的不连续内存，大小可固定可扩展外，还可以选择不实现垃圾收集。相对而言，垃圾收集在这个区域是比较少出现的，但也不是“永久代”了。此区域内存回收主要针对常量池的回收和对类型的卸载。但是回收成绩总是很差，但是确实又是有必要的，否则会有内存泄漏隐患
 7. 方法区无法满足内存分布需求时，抛出OutOfMemoryError
 
@@ -67,6 +70,26 @@ Java虚拟机在执行Java程序的过程中会把它所管理的内存划分为
 #### 总结
 
 ![运行时数据区总结](pic\JAVA运行时数据区.png)
+
+#### JDK1.8 补充
+
+##### Perm永久代
+
+绝大部分 Java 程序员应该都见过 "java.lang.OutOfMemoryError: PermGen space "这个异常。这里的 “PermGen space”其实指的就是方法区。不过**方法区和“PermGen space”又有着本质的区别**。前者是 JVM 的规范，而后者则是 JVM 规范的一种实现，并且只有 HotSpot 才有 “PermGen space”，而对于其他类型的虚拟机，如 JRockit（Oracle）、J9（IBM） 并没有“PermGen space”。由于方法区主要存储类的相关信息，所以对于动态生成类的情况比较容易出现永久代的内存溢出。最典型的场景就是，在 jsp 页面比较多的情况，容易出现永久代内存溢出。我们可以通过动态生成类来模拟 “PermGen space”的内存溢出。
+
+##### Metaspace(元空间)
+
+其实，**移除永久代的工作从JDK1.7就开始了**。JDK1.7中，**存储在永久代的部分数据就已经转移到了Java Heap或者是 Native Heap**。但永久代仍存在于JDK1.7中，并没完全移除，譬如符号引用(Symbols)转移到了native heap；字面量(interned strings)转移到了java heap；类的静态变量(class statics)转移到了java heap。
+
+元空间的本质和永久代类似，都是对JVM规范中方法区的实现。不过元空间与永久代之间最大的区别在于：**元空间并不在虚拟机中，而是使用本地内存**。因此，**默认情况下，元空间的大小仅受本地内存限制**，但可以通过以下参数来指定元空间的大小：
+
+- -XX:MetaspaceSize，初始空间大小，达到该值就会触发垃圾收集进行类型卸载，同时GC会对该值进行调整：如果释放了大量的空间，就适当降低该值；如果释放了很少的空间，那么在不超过MaxMetaspaceSize时，适当提高该值。
+- -XX:MaxMetaspaceSize，最大空间，默认是没有限制的。
+
+除了上面两个指定大小的选项以外，还有两个与 GC 相关的属性：
+
+- -XX:MinMetaspaceFreeRatio，在GC之后，最小的Metaspace剩余空间容量的百分比，减少为分配空间所导致的垃圾收集
+- -XX:MaxMetaspaceFreeRatio，在GC之后，最大的Metaspace剩余空间容量的百分比，减少为释放空间所导致的垃圾收集
 
 # HotSpot虚拟机对象探秘
 
@@ -333,7 +356,7 @@ public class RuntimeConstantPoolOOM {
 
 ```
 
-运行结果（未运行，抄的书）：
+运行结果（未运行，抄的书，需要1.6运行）：
 
 ```
 Exception in thread "main" java.lang.OutOfMemoryError: PermGen space
@@ -344,7 +367,7 @@ Exception in thread "main" java.lang.OutOfMemoryError: PermGen space
 
 从运行结果中可以看到，运行时常量池溢出，在OutOfMemoryError后面跟随的提示信息是“PermGen space”，说明运行时常量池属于方法区（HotSpot虚拟机中的永久代）的一 部分。
 
-而使用JDK 1.7运行这段程序就不会得到相同的结果，while循环将一直进行下去。关于这个字符串常量池的实现问题，还可以引申出一个更有意思的影响，如下面代码所示。
+而**使用JDK 1.7运行这段程序就不会得到相同的结果，while循环将一直进行下去**。关于这个字符串常量池的实现问题，还可以引申出一个更有意思的影响，如下面代码所示。
 
 ```
 package com.eussi;
@@ -466,5 +489,5 @@ Exception in thread "main" java.lang.OutOfMemoryError
 
 # 相关代码
 
-[本章代码]: code\JVMOutOfMemory.zip
+[本章代码]: code\jvm-test
 
