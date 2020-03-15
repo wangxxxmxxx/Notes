@@ -18,4 +18,5 @@ public class Sed {
 将package一行移动插入至第一个import行前面
 
 Notice:
-经测试，如果直接改写文件，-i命令需放在-n命令后
+1、经测试，如果直接改写文件，-i命令需放在-n命令后
+2、另外，如果不存在import行，package行会丢失
