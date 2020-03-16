@@ -1,4 +1,4 @@
-package com.eussi.ch01_memory_error;
+package com.eussi.ch02_memory_error;
 /**
  * VM Args: -Xss128k
  * @author wangxueming

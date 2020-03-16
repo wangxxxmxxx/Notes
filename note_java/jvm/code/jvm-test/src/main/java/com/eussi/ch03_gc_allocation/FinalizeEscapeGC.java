@@ -1,4 +1,4 @@
-package com.eussi.ch02_gc_allocation;
+package com.eussi.ch03_gc_allocation;
 
 /**
  * 此代码演示了两点：

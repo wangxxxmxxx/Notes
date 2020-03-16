@@ -1,4 +1,4 @@
-package com.eussi.ch02_gc_allocation;
+package com.eussi.ch03_gc_allocation;
 
 /**
  * 执行后，objA和objB会不会被GC呢？

@@ -40,7 +40,7 @@ Java获得广泛认有以下原因：
 
 我们可以把Java程序设计语言、Java虚拟机、Java API类库这三部分统称为JDK (Java Development Kit)，JDK是用于支持Java程序开发的最小环境，在后面的内容中，为了讲解方便，有一些地方会以JDK来代替整个Java技术体系。另外，可以把Java API类库中的 Java SE API子集和Java虚拟机这两部分统称为JRE (Java Runtime Environment)，JRE是支持Java程序运行的标准环境。下图展示了Java技术体系所包含的内容，以及JDK和JRE所涵盖的范围：
 
-![Java技术体系](pic\JavaPlatform.png)
+![Java技术体系](pic/JavaPlatform.png)
 
 [图片来源]: https://docs.oracle.com/javase/7/docs/
 
@@ -58,9 +58,9 @@ Java获得广泛认有以下原因：
 
 #### Java发展史
 
-![Java技术发展时间线](pic\JavaDevelopment.png)
+![Java技术发展时间线](pic/JavaDevelopment.png)
 
-![Java发展重要节点](pic\JavaDevelopment2.jpg)
+![Java发展重要节点](pic/JavaDevelopment2.jpg)
 
 #### Java虚拟机发展史
 

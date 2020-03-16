@@ -1,4 +1,4 @@
-package com.eussi.ch01_memory_error;
+package com.eussi.ch02_memory_error;
 
 /**
  * VM Args: -Xss2M(这时候不妨设置大些）
