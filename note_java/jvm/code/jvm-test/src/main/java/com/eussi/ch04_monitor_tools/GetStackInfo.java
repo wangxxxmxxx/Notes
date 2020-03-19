@@ -20,5 +20,6 @@ public class GetStackInfo {
                 System.out.println("\t" + element + "\n");
             }
         }
+        System.gc();
     }
 }
