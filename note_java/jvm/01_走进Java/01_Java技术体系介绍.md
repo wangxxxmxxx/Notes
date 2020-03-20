@@ -42,7 +42,7 @@ Java获得广泛认有以下原因：
 
 我们可以把Java程序设计语言、Java虚拟机、Java API类库这三部分统称为JDK (Java Development Kit)，JDK是用于支持Java程序开发的最小环境，在后面的内容中，为了讲解方便，有一些地方会以JDK来代替整个Java技术体系。另外，可以把Java API类库中的 Java SE API子集和Java虚拟机这两部分统称为JRE (Java Runtime Environment)，JRE是支持Java程序运行的标准环境。下图展示了Java技术体系所包含的内容，以及JDK和JRE所涵盖的范围：
 
-![Java技术体系](pic/JavaPlatform.png)
+![Java技术体系](../pic/JavaPlatform.png)
 
 [图片来源]: https://docs.oracle.com/javase/7/docs/
 
@@ -60,9 +60,9 @@ Java获得广泛认有以下原因：
 
 #### Java发展史
 
-![Java技术发展时间线](pic/JavaDevelopment.png)
+![Java技术发展时间线](../pic/JavaDevelopment.png)
 
-![Java发展重要节点](pic/JavaDevelopment2.jpg)
+![Java发展重要节点](../pic/JavaDevelopment2.jpg)
 
 #### Java虚拟机发展史
 
@@ -175,3 +175,4 @@ Sun(已被Oracle收购)专门为改进Java语法在OpenJDK中建立Coin子项目
 Java程序运行在64VM上需要付出较大的额外代价。相对于32位，如消耗更多内存及慢得多运行速度。但在Java EE方面,企业级应用常常需要超过4GB的内存,对64VM的需求是非常迫切的。由于上述原因，很多企业应用仍采用在虚拟集群方式在32位VM上进行部署。但随着硬件的发展,计算机终究会过渡到64位时代,主流的VM应用也将从32位发展到64位,VM对64位的支持将进一步完善。
 
 #### 自己编译JDK（待执行）
+
