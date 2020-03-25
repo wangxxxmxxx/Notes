@@ -16,6 +16,10 @@ public class RedisLua {
         evalLua();
         //通过摘要执行Lua脚本缓存
         evalshaLua();
+
+        //根据传入参数，可能会失败
+        evalshaLua();
+        evalshaLua();
     }
 
     private static void evalLua() throws Exception {

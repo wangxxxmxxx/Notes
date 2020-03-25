@@ -18,7 +18,7 @@ public class RedisLock {
             Jedis jedis = RedisManager.getJedis();
             String value = UUID.randomUUID().toString();//UUID
             long end = System.currentTimeMillis() + timeout*1000;
-            while (System.currentTimeMillis() < end) {
+            while (System.currentTimeMillis() < end) {//在一段时间内尝试获取锁
                 if (jedis.setnx(key, value) == 1) {//设置成功返回1
                     jedis.expire(key, timeout);
                     //锁设置成功, redis操作成功
@@ -67,7 +67,8 @@ public class RedisLock {
             System.out.println("获得锁失败！");
         }
 
-        redisLock.releaseLock("lock:test2", lockId);
+//        redisLock.releaseLock("lock:test2", lockId);//注释此句代码则获取失败,注释后调整下面锁的获取时间，大于超时时间也可以
+
 
         lockId = redisLock.getLock("lock:test2", 5);
         if(null!=lockId) {
