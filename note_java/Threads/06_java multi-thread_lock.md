@@ -1,18 +1,41 @@
-1-锁的基本原理
-	与synchronized不同，Lock完全用Java写成，在java这个层面是无关JVM实现的。在java.util.concurrent.lock包中有很多Lock的实现类，常用的有ReentrantLock、ReadWriteLock（实现类ReentrantReadWriteLock），其实现都依赖java.util.concurrent.AbstractQueuedSynchronizer类，实现思路都大同小异，因此我们以ReentrantLock作为讲解切入点。
-	1、ReentrantLock的调用过程
-		经过观察ReentrantLock把所有Lock接口的操作都委派到一个Sync类上，该类继承了AbstractQueuedSynchronizer：static abstract class Sync extends AbstractQueuedSynchronizer
-		Sync又有两个子类：
-			final static class NonfairSync extends Sync
-			final static class FairSync extends Sync  
-		显然是为了支持公平锁和非公平锁而定义，默认情况下为非公平锁。
-		先理一下Reentrant.lock()方法的调用过程（默认非公平锁）：
-			见图：ReentranLock.lock方法调用过程.gif
-		Template模式导致很难直观的看到整个调用过程，其实通过上面调用过程及AbstractQueuedSynchronizer的注释可以发现，AbstractQueuedSynchronizer中抽象了绝大多数Lock的功能，而只把tryAcquire方法延迟到子类中实现。tryAcquire方法的语义在于用具体子类判断请求线程是否可以获得锁，无论成功与否AbstractQueuedSynchronizer都将处理后面的流程。
-	2、Lock VS Synchronized
-		1.AbstractQueuedSynchronizer通过构造一个基于阻塞的CLH队列容纳所有的阻塞线程，而对该队列的操作均通过Lock-Free（CAS）操作，但对已经获得锁的线程而言，ReentrantLock实现了偏向锁的功能。
-		2.synchronized的底层也是一个基于CAS操作的等待队列，但JVM实现的更精细，把等待队列分为ContentionList和EntryList，目的是为了降低线程的出列速度；当然也实现了偏向锁，从数据结构来说二者设计没有本质区别。但synchronized还实现了自旋锁，并针对不同的系统和硬件体系进行了优化，而Lock则完全依靠系统阻塞挂起等待线程。
-		3.当然Lock比synchronized更适合在应用层扩展，可以继承AbstractQueuedSynchronizer定义各种实现，比如实现读写锁（ReadWriteLock），公平或不公平锁；同时，Lock对应的Condition也比wait/notify要方便的多、灵活的多。synchronized使用的内置锁和ReentrantLock这种显式锁在java6以后性能没多大差异，在更新的版本中内置锁只会比显式锁性能更好。这两种锁都是独占锁，java5以前内置锁性能低的原因是它没做任何优化，直接使用系统的互斥体来获取锁。显式锁除了CAS的时候利用的是本地代码以外，其它的部分都是Java代码实现的，在后续版本的Java中，显式锁不太可能会比内置锁好，只会更差。使用显式锁的唯一理由是要利用它更多的功能。
+[TOC]
+
+# 锁的基本原理
+
+与synchronized不同，Lock完全用Java写成，在java这个层面是无关JVM实现的。在java.util.concurrent.lock包中有很多Lock的实现类，常用的有ReentrantLock、ReadWriteLock（实现类ReentrantReadWriteLock），其实现都依赖java.util.concurrent.AbstractQueuedSynchronizer类，实现思路都大同小异，因此我们以ReentrantLock作为讲解切入点。
+
+#### ReentrantLock的调用过程
+
+经过观察ReentrantLock把所有Lock接口的操作都委派到一个Sync类上，该类继承了AbstractQueuedSynchronizer：static abstract class Sync extends AbstractQueuedSynchronizer
+
+Sync又有两个子类：
+
+```
+final static class NonfairSync extends Sync
+final static class FairSync extends Sync
+```
+
+显然是为了支持公平锁和非公平锁而定义，默认情况下为非公平锁。
+
+先理一下Reentrant.lock()方法的调用过程（默认非公平锁）：
+
+![lock方法调用过程](pic/ReentranLock.lock方法调用过程.gif)
+
+Template模式导致很难直观的看到整个调用过程，其实通过上面调用过程及AbstractQueuedSynchronizer的注释可以发现，AbstractQueuedSynchronizer中抽象了绝大多数Lock的功能，而只把tryAcquire方法延迟到子类中实现。tryAcquire方法的语义在于用具体子类判断请求线程是否可以获得锁，无论成功与否AbstractQueuedSynchronizer都将处理后面的流程。
+
+#### Lock VS Synchronized
+
+1. AbstractQueuedSynchronizer通过构造一个基于阻塞的CLH队列(自旋锁,能确保无饥饿性,提供先来先服务的公平性)容纳所有的阻塞线程，而对该队列的操作均通过Lock-Free（CAS）操作，但对已经获得锁的线程而言，ReentrantLock实现了偏向锁的功能。
+2. synchronized的底层也是一个基于CAS操作的等待队列，但JVM实现的更精细，把等待队列分为ContentionList和EntryList，目的是为了降低线程的出列速度；当然也实现了偏向锁，从数据结构来说二者设计没有本质区别。但synchronized还实现了自旋锁，并针对不同的系统和硬件体系进行了优化，而Lock则完全依靠系统阻塞挂起等待线程。
+3. 当然Lock比synchronized更适合在应用层扩展，可以继承AbstractQueuedSynchronizer定义各种实现，比如实现读写锁（ReadWriteLock），公平或不公平锁；同时，Lock对应的Condition也比wait/notify要方便的多、灵活的多。synchronized使用的内置锁和ReentrantLock这种显式锁在java6以后性能没多大差异，在更新的版本中内置锁只会比显式锁性能更好。这两种锁都是独占锁，java5以前内置锁性能低的原因是它没做任何优化，直接使用系统的互斥体来获取锁。显式锁除了CAS的时候利用的是本地代码以外，其它的部分都是Java代码实现的，在后续版本的Java中，显式锁不太可能会比内置锁好，只会更差。使用显式锁的唯一理由是要利用它更多的功能。
+
+
+
+​		
+​		
+
+
+
 2-synchronized的缺陷
 	1、我们知道，可以利用synchronized关键字来实现共享资源的互斥访问。Java 5在java.util.concurrent.locks包下提供了另一种来实现线程的同步访问，那就是Lock。既然有了synchronized来实现线程同步，Java为什么还需要提供Lock呢？
 	synchronized是Java的一个关键字，当我们使用synchronized来修饰方法或代码块时，线程必须先获得对应的锁才能执行该段代码。而其他线程只能一直等待，直到当前线程释放锁并获得对应的锁才能进入该段代码。这里获取锁的线程释放锁只会有两种情况：
@@ -43,6 +66,7 @@
 		    //处理任务  
 		}catch(Exception ex){  
 		       
+
 		}finally{  
 		    lock.unlock();   //释放锁  
 		}  
@@ -218,7 +242,7 @@
 			   Object data;
 			   volatile boolean cacheValid;
 			   ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
-
+	
 			   void processCachedData() {
 				 rwl.readLock().lock();
 				 if (!cacheValid) {
@@ -235,9 +259,9 @@
 					rwl.readLock().lock();
 					rwl.writeLock().unlock(); // Unlock write, still hold read
 				 }
-
+	
 				 use(data);
 				 rwl.readLock().unlock();
 			   }
 			 }
- 
+
