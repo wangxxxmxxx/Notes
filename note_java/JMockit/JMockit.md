@@ -679,3 +679,400 @@ public class VerificationTest {
 
 如果你还关心方法的调用顺序，你可以使用new VerificationsInOrder() {{}}。这里不做详细的介绍了。
 
+# 常见用法
+
+## Mock类
+
+一个普通的类，这个类有static,final,native,private方法。以及一个非static/final/native/private的普通public 方法。
+
+```
+//一个普通类
+public class AnOrdinaryClass {
+
+    // 静态方法
+    public static int staticMethod() {
+        return 1;
+    }
+
+    // 普通方法
+    public int ordinaryMethod() {
+        return 2;
+    }
+
+    // final方法
+    public final int finalMethod() {
+        return 3;
+    }
+
+    // native方法,返回4
+//    public native int navtiveMethod();
+
+    // private方法
+    private int privateMethod() {
+        return 5;
+    }
+
+    // 调用private方法
+    public int callPrivateMethod() {
+        return privateMethod();
+    }
+}
+```
+
+1. 用Expectations来Mock。
+
+```
+//用Expectations来mock类
+public class ClassMockingByExpectationsTest {
+
+    @Test
+    public void testClassMockingByExpectation() {
+        final AnOrdinaryClass instanceToRecord = new AnOrdinaryClass();
+
+        new Expectations(AnOrdinaryClass.class) {
+            {
+                // mock静态方法
+                AnOrdinaryClass.staticMethod();
+                result = 10;
+                // mock普通方法
+                instanceToRecord.ordinaryMethod();
+                result = 20;
+                // mock final方法
+                instanceToRecord.finalMethod();
+                result = 30;
+                // native, private方法无法用Expectations来Mock
+            }
+        };
+        AnOrdinaryClass instance = new AnOrdinaryClass();
+        Assert.assertTrue(AnOrdinaryClass.staticMethod() == 10);
+        Assert.assertTrue(instance.ordinaryMethod() == 20);
+        Assert.assertTrue(instance.finalMethod() == 30);
+        // 用Expectations无法mock native方法
+//        Assert.assertTrue(instance.navtiveMethod() == 4);
+        // 用Expectations无法mock private方法
+        Assert.assertTrue(instance.callPrivateMethod() == 5);
+    }
+
+    @BeforeClass
+    // 加载AnOrdinaryClass类的native方法的native实现
+    public static void loadNative() throws Throwable {
+//        JNITools.loadNative();
+    }
+}
+```
+
+2. 用MockUp来Mock类
+
+```
+//用MockUp来mock类
+public class ClassMockingByMockUpTest {
+    // AnOrdinaryClass的MockUp类，继承MockUp即可
+    public static class AnOrdinaryClassMockUp extends MockUp<AnOrdinaryClass> {
+        // Mock静态方法
+        @Mock
+        public static int staticMethod() {
+            return 10;
+        }
+
+        // Mock普通方法
+        @Mock
+        public int ordinaryMethod() {
+            return 20;
+        }
+
+        @Mock
+        // Mock final方法
+        public final int finalMethod() {
+            return 30;
+        }
+
+        // Mock native方法
+        @Mock
+        public int navtiveMethod() {
+            return 40;
+        }
+
+        // Mock private方法
+        @Mock
+        private int privateMethod() {
+            return 50;
+        }
+    }
+
+    @Test
+    public void testClassMockingByMockUp() {
+        new AnOrdinaryClassMockUp();
+        AnOrdinaryClass instance = new AnOrdinaryClass();
+        // 静态方法被mock了
+        Assert.assertTrue(AnOrdinaryClass.staticMethod() == 10);
+        // 普通方法被mock了
+        Assert.assertTrue(instance.ordinaryMethod() == 20);
+        // final方法被mock了
+        Assert.assertTrue(instance.finalMethod() == 30);
+        // native方法被mock了
+//        Assert.assertTrue(instance.navtiveMethod() == 40);
+        // private方法被mock了
+        Assert.assertTrue(instance.callPrivateMethod() == 50);
+    }
+
+    @BeforeClass
+    // 加载AnOrdinaryClass类的native方法的native实现
+    public static void loadNative() throws Throwable {
+//        JNITools.loadNative();
+    }
+}
+```
+
+## Mock实例
+
+Mock实例的用法基本一样。只需要把Expectations的构造函数参数换成实例即可。
+
+用Expectations来Mock类与用Expectations来Mock实例的唯一不同就在于，前者影响类的所有实例，而后者只影响某一个实例。
+
+```
+//mock实例
+public class InstanceMockingByExpectationsTest {
+    @Test
+    public void testInstanceMockingByExpectation() {
+        final AnOrdinaryClass instance = new AnOrdinaryClass();
+        // 直接把实例传给Expectations的构造函数即可Mock这个实例
+        new Expectations(instance) {
+            {
+                // 尽管这里也可以Mock静态方法，但不推荐在这里写。静态方法的Mock应该是针对类的
+                // mock普通方法
+                instance.ordinaryMethod();
+                result = 20;
+                // mock final方法
+                instance.finalMethod();
+                result = 30;
+                // native, private方法无法用Expectations来Mock
+            }
+        };
+        Assert.assertTrue(AnOrdinaryClass.staticMethod() == 0);
+        Assert.assertTrue(instance.ordinaryMethod() == 20);
+        Assert.assertTrue(instance.finalMethod() == 30);
+        // 用Expectations无法mock native方法
+//        Assert.assertTrue(instance.navtiveMethod() == 4);
+        // 用Expectations无法mock private方法
+        Assert.assertTrue(instance.callPrivateMethod() == 5);
+    }
+
+    @BeforeClass
+    // 加载AnOrdinaryClass类的native方法的native实现
+    public static void loadNative() throws Throwable {
+//        JNITools.loadNative();
+    }
+}
+```
+
+## Mock接口
+
+一个普通接口的代码。
+
+```
+//一个普通的接口
+public interface AnOrdinaryInterface {
+    // 方法1
+    public int method1();
+
+    // 方法2
+    public int method2();
+}
+```
+
+1. 用Expectations来Mock
+
+```
+//用Expectations来mock接口
+public class InterfaceMockingByExpectationsTest {
+
+    // 通过@Injectable，让JMockit帮我们生成这个接口的实例，
+    // 一般来说，接口是给类来依赖的，我们给待测试的类加上@Tested，就可以让JMockit做依赖注入。
+    @Injectable
+    AnOrdinaryInterface anOrdinaryInterface;
+
+    @Test
+    public void testInterfaceMockingByExpectation() {
+        // 录制
+        new Expectations() {
+            {
+                anOrdinaryInterface.method1();
+                result = 10;
+                anOrdinaryInterface.method2();
+                result = 20;
+            }
+        };
+        Assert.assertTrue(anOrdinaryInterface.method1() == 10);
+        Assert.assertTrue(anOrdinaryInterface.method2() == 20);
+    }
+}
+```
+
+2. 用MockUp来Mock
+
+```
+//用MockUp来mock接口
+public class InterfaceMockingByMockUpTest {
+
+    @Test
+    public void testInterfaceMockingByMockUp() {
+        // 手工通过MockUp创建这个接口的实例
+        AnOrdinaryInterface anOrdinaryInterface = new MockUp<AnOrdinaryInterface>(AnOrdinaryInterface.class) {
+            // 对方法Mock
+            @Mock
+            public int method1() {
+                return 10;
+            }
+
+            @Mock
+            public int method2() {
+                return 20;
+            }
+        }.getMockInstance();
+
+        Assert.assertTrue(anOrdinaryInterface.method1() == 10);
+        Assert.assertTrue(anOrdinaryInterface.method2() == 20);
+    }
+}
+```
+
+## 用JMockit做代码覆盖率
+
+说到代码覆盖率，你肯定会想到Jacoco， 其实JMockit相比Jacoco，做代码覆盖率，一样很强大。如果你关心代码的路径覆盖率，JMockit有，而Jacoco没有。
+
+那我们该如何配置JMockit做覆盖率呢？很简单，只需要在pom.xml给surefire(即mvn test背后的maven插件)配置一些参数即可。
+
+在pom.xml中给插件surefire增加一些参数即可。
+
+```
+<plugin>
+	<artifactId>maven-surefire-plugin</artifactId>
+	<version>2.20</version>
+	<configuration>
+		<disableXmlReport>true</disableXmlReport>
+		<argLine>-Dcoverage-metrics=all</argLine>
+	</configuration>
+</plugin>
+```
+
+执行mvn test后，去target/coverage-report目录下看覆盖率，用浏览器打开index.html
+
+JMockit给我们提供的行覆盖率，路径覆盖率，数据覆盖率。
+
+行覆盖率是从代码行的维度进行统计，哪些行被测试到了，不做详细介绍。
+
+数据覆盖率是指一个类的哪些非静态属性被修改过了，这个不常用，指导意义也不大。也不做详细介绍。
+
+重点介绍一下，JMockit的路径覆盖率和Jacoco的分支覆盖率，这2个是非常容易混淆的概念。
+
+咱们先拿几个简单的类来做测试，并分别看其JMockit的路径覆盖率结果，Jacoco的分支覆盖率结果。
+
+比如要测试这个简单的类，
+
+```
+//打招呼的接口
+public interface ISayHello {
+	// 性别：男
+	int MALE = 0;
+	// 性别：女
+	int FEMALE = 1;
+
+	/**
+	 * 打招呼
+	 * 
+	 * @param who    向谁说
+	 * @param gender 对方的性别
+	 * @return 返回打招呼的内容
+	 */
+	String sayHello(String who, int gender);
+
+	/**
+	 * 向多个人打招呼
+	 * 
+	 * @param who    向谁说
+	 * @param gender 对方的性别
+	 * @return 返回向多个人打招呼的内容
+	 */
+	List<String> sayHello(String[] who, int[] gender);
+}
+```
+
+```
+public class SayHello implements ISayHello {
+	public String sayHello(String who, int gender) {
+		// 性别校验
+		if (gender != FEMALE) {
+			if (gender != MALE) {
+				throw new IllegalArgumentException("illegal gender");
+			}
+		}
+		// 根据不同性别，返回不同打招呼的内容
+		switch (gender) {
+		case FEMALE:
+			return "hello Mrs " + who; 
+		case MALE:
+			return "hello Mr " + who;
+		default:
+			return "hello  " + who;
+		}
+	}
+
+	public List<String> sayHello(String[] who, int[] gender) {
+		// 参数校验
+		if (who == null || gender == null) {
+			return null;
+		}
+		if (who.length != gender.length) {
+			throw new IllegalArgumentException();
+		}
+		//把向每个人打招呼的内容，保存到result中。
+		List<String> result = new ArrayList<String>();
+		for (int i = 0; i < gender.length; i++) {
+			result.add(this.sayHello(who[i], gender[i]));
+		}
+		return result;
+	}
+}
+```
+
+上面2个类，一个是接口，另一个是实现该接口的类。 类的功能十分简单，就是向别人打招呼。 假设现在我们要测试SayHello这个类。
+
+测试代码如下：
+
+```
+//代码覆盖率测试，观察覆盖率的计算方式,去target/coverage-report目录下，查看SayHello这个类的覆盖率
+public class CodeCoverageTest {
+    ISayHello sayHello = new SayHello();
+
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
+
+    //测试 sayHello(String who, int gender);
+    @Test
+    public void testSayHello1() {
+        Assert.assertTrue(sayHello.sayHello("david", ISayHello.MALE).equals("hello Mr david"));
+        Assert.assertTrue(sayHello.sayHello("lucy", ISayHello.FEMALE).equals("hello Mrs lucy"));
+        thrown.expect(IllegalArgumentException.class);
+        sayHello.sayHello("david", 3);
+    }
+    //测试 sayHello(String[] who, int[] gender)
+    @Test
+    public void testSayHello2() {
+        String[] who = new String[] { "david", "lucy" };
+        int[] gender = new int[] { ISayHello.MALE, ISayHello.FEMALE };
+        List<String> result = sayHello.sayHello(who, gender);
+        Assert.assertTrue(result.get(0).equals("hello Mr david"));
+        Assert.assertTrue(result.get(1).equals("hello Mrs lucy"));
+    }
+}
+```
+
+测试代码功能也十分简单，用几种常用的入参做了测试。 测试运行后(mvn test或idea/eclipse运行测试)，就在target/coverage-report目录下，生成了覆盖的结果，从结果中，打开SayHello类的覆盖率结果。
+
+![](D:\workplace\Notes\note_java\JMockit\pic\sayhello_index.png)
+
+
+
+![](D:\workplace\Notes\note_java\JMockit\pic\sayhello.png)
+
+可以用Jacoco来做覆盖率的统计，查看其分支覆盖率测试结果，进行对比。
