@@ -1069,10 +1069,148 @@ public class CodeCoverageTest {
 
 测试代码功能也十分简单，用几种常用的入参做了测试。 测试运行后(mvn test或idea/eclipse运行测试)，就在target/coverage-report目录下，生成了覆盖的结果，从结果中，打开SayHello类的覆盖率结果。
 
-![](D:\workplace\Notes\note_java\JMockit\pic\sayhello_index.png)
+![](.\pic\sayhello_index.png)
 
 
 
-![](D:\workplace\Notes\note_java\JMockit\pic\sayhello.png)
+![](.\pic\sayhello.png)
 
 可以用Jacoco来做覆盖率的统计，查看其分支覆盖率测试结果，进行对比。
+
+# 高级用法
+
+## Mock构造函数&初始化代码块
+
+有时候，有些编写不良好的类的构造函数，初始代码块，静态代码块存在大量的初始化逻辑，初始化会报错。
+
+比如，有些类初始化的时候就去连结DB，连不上就报错，影响我们的测试程序的运行。
+
+此时，我们需要把这些初始化逻辑Mock掉。用我们的Mock逻辑替代，见如下的例子：
+
+```
+//一个包含初始代码块的普通类
+public class AnOrdinaryClassWithBlock {
+    private int i;
+    public static int j;
+
+    // 初始代码块
+    {
+        i = 1;
+    }
+    // 静态初始代码块
+    static {
+        j = 2;
+    }
+    // 构造函数
+    public AnOrdinaryClassWithBlock(int i) {
+        this.i = i;
+    }
+    public int getI() {
+        return i;
+    }
+    public void setI(int i) {
+        this.i = i;
+    }
+}
+```
+
+```
+//Mock构造函数&初始代码块
+public class ConstructorAndBlockMockingTest {
+    // AnOrdinaryClassWithBlock的MockUp类，继承MockUp即可
+    public static class AnOrdinaryClassWithBlockMockUp extends MockUp<AnOrdinaryClassWithBlock> {
+        // Mock构造函数和初始代码块, 函数名$init就代表类的构造函数
+        @Mock
+        public void $init(int i) {
+        }
+
+        // Mock静态初始代码块,, 函数名$init就代表类的静态代码块
+        @Mock
+        public void $clinit() {
+        }
+    }
+
+    @Test
+    public void testClassMockingByMockUp() {
+        new AnOrdinaryClassWithBlockMockUp();
+        AnOrdinaryClassWithBlock instance = new AnOrdinaryClassWithBlock(10);
+        // 静态初始代码块被mock了
+        Assert.assertTrue(AnOrdinaryClassWithBlock.j == 0);
+        // 构造函数和初始代码块被mock
+        Assert.assertTrue(instance.getI() == 0);
+    }
+}
+```
+
+## Mock一类多实例
+
+@Mocked把类的所有的实例都Mock了。有时候我们希望一个类不同的实例有不同的Mock逻辑。
+
+下面列举3种方法。还是以如何Mock类中的提到的AnOrdinaryClass为例。
+
+```
+//一个类多个实例的Mock
+public class OneClassManyInstanceMockingTest {
+    // Mock方法一: 把实例传入Expectations的构造函数。适用场景： 只Mock实例的部分方法，对实例的类的其它实例不产生影响
+    @Test
+    public void testMocking1() {
+        AnOrdinaryClass instance1 = new AnOrdinaryClass();
+        AnOrdinaryClass instance2 = new AnOrdinaryClass();
+        // 直接把实例传给Expectations的构造函数即可Mock这个实例
+        new Expectations(instance1, instance2) {
+            {
+                instance1.ordinaryMethod();
+                result = 20;
+                instance2.ordinaryMethod();
+                result = 200;
+            }
+        };
+        AnOrdinaryClass instance3 = new AnOrdinaryClass();
+        // instance1的ordinaryMethod被Mock了
+        Assert.assertTrue(instance1.ordinaryMethod() == 20);
+        // instance2的ordinaryMethod被Mock了
+        Assert.assertTrue(instance2.ordinaryMethod() == 200);
+        // instance3不受影响。
+        Assert.assertTrue(instance3.ordinaryMethod() == 2);
+    }
+    // Mock方法二: 用@Mocked。适用场景： 类的所有实例都需要Mock，但不同实例也能保留不同的Mock逻辑
+    @Test
+    public void testMocking2(@Mocked AnOrdinaryClass instance1, @Mocked AnOrdinaryClass instance2) {
+        new Expectations() {
+            {
+                instance1.ordinaryMethod();
+                result = 20;
+                instance2.ordinaryMethod();
+                result = 200;
+            }
+        };
+        AnOrdinaryClass instance3 = new AnOrdinaryClass();
+        // instance1的ordinaryMethod被Mock了
+        Assert.assertTrue(instance1.ordinaryMethod() == 20);
+        // instance2的ordinaryMethod被Mock了
+        Assert.assertTrue(instance2.ordinaryMethod() == 200);
+        // instance3受@Mock的影响。@Mock会把类的所有方法都Mock，返回类型为基本数据类型的返回0
+        Assert.assertTrue(instance3.ordinaryMethod() == 0);
+    }
+    // Mock方法三: 用@Injectable。适用场景： 不是类的所有实例都需要Mock，不同实例也能保留不同的Mock逻辑
+    @Test
+    public void testMocking3(@Injectable AnOrdinaryClass instance1, @Injectable AnOrdinaryClass instance2) {
+        new Expectations() {
+            {
+                instance1.ordinaryMethod();
+                result = 20;
+                instance2.ordinaryMethod();
+                result = 200;
+            }
+        };
+        AnOrdinaryClass instance3 = new AnOrdinaryClass();
+        // instance1的ordinaryMethod被Mock了
+        Assert.assertTrue(instance1.ordinaryMethod() == 20);
+        // instance2的ordinaryMethod被Mock了
+        Assert.assertTrue(instance2.ordinaryMethod() == 200);
+        // instance3不受@Injectable的影响。因为@Injectable只影响某个实例
+        Assert.assertTrue(instance3.ordinaryMethod() == 2);
+    }
+}
+```
+
