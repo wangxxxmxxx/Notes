@@ -2307,3 +2307,8 @@ public class OrderServiceAutoTest extends OrderServiceAutoMock {
 
 }
 ```
+
+# 相关代码
+
+[src code](jmockit)
+
