@@ -19,7 +19,7 @@ public class TestedAndInjectable {
 
 	// 测试注入方式
 	@Test
-	public void testSubmitOrder(@Injectable MailService mailService, @Injectable UserCheckService userCheckService) {
+	public void testSubmitOrder(@Injectable final MailService mailService, @Injectable final UserCheckService userCheckService) {
 		new Expectations() {
 			{
 				// 当向testUserId发邮件时，假设都发成功了

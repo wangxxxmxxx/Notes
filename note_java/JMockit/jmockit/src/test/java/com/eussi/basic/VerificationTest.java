@@ -12,7 +12,7 @@ public class VerificationTest {
     @Test
     public void testVerification() {
         // 录制阶段
-        Calendar cal = Calendar.getInstance();
+        final Calendar cal = Calendar.getInstance();
         new Expectations(Calendar.class) {
             {
                 // 对cal.get方法进行录制，并匹配参数 Calendar.YEAR

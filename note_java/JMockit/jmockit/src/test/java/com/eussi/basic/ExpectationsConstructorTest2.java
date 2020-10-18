@@ -13,7 +13,7 @@ public class ExpectationsConstructorTest2 {
     // 把类传入Expectations的构造函数
     @Test
     public void testRecordConstrutctor1() {
-        Calendar cal = Calendar.getInstance();
+        final Calendar cal = Calendar.getInstance();
         // 把待Mock的类传入Expectations的构造函数，可以达到只mock类的部分行为的目的
         new Expectations(Calendar.class) {
             {
@@ -32,7 +32,7 @@ public class ExpectationsConstructorTest2 {
     // 把对象传入Expectations的构造函数
     @Test
     public void testRecordConstrutctor2() {
-        Calendar cal = Calendar.getInstance();
+        final Calendar cal = Calendar.getInstance();
         // 把待Mock的对象传入Expectations的构造函数，可以达到只mock类的部分行为的目的，但只对这个对象影响
         new Expectations(cal) {
             {

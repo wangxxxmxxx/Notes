@@ -28,7 +28,7 @@ public class CapturingTest {
 			new Class[] { IPrivilege.class }, new InvocationHandler() {
 				@Override
 				public Object invoke(Object proxy, Method method, Object[] args) {
-					if ((long) args[0] == testUserId) {
+					if ((Long) args[0] == testUserId) {
 						return false;
 					}
 					return true;
@@ -37,7 +37,7 @@ public class CapturingTest {
 
 	// 有Cautring情形
 	@Test
-	public void testCaputring(@Capturing IPrivilege privilegeManager) {
+	public void testCaputring(@Capturing final IPrivilege privilegeManager) {
 		// 加上了JMockit的API @Capturing,
 		// JMockit会帮我们实例化这个对象，它除了具有@Mocked的特点，还能影响它的子类/实现类
 		new Expectations() {

@@ -38,7 +38,7 @@ public class ProgramConstructureTest {
     }
 
     @Test
-    public void test2(@Mocked HelloJMockit helloJMockit /* 这是一个测试参数 */) {
+    public void test2(@Mocked final HelloJMockit helloJMockit /* 这是一个测试参数 */) {
         // 录制(Record)
         new Expectations() {
             {

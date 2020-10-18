@@ -12,8 +12,8 @@ public class OneClassManyInstanceMockingTest {
     // Mock方法一: 把实例传入Expectations的构造函数。适用场景： 只Mock实例的部分方法，对实例的类的其它实例不产生影响
     @Test
     public void testMocking1() {
-        AnOrdinaryClass instance1 = new AnOrdinaryClass();
-        AnOrdinaryClass instance2 = new AnOrdinaryClass();
+        final AnOrdinaryClass instance1 = new AnOrdinaryClass();
+        final AnOrdinaryClass instance2 = new AnOrdinaryClass();
         // 直接把实例传给Expectations的构造函数即可Mock这个实例
         new Expectations(instance1, instance2) {
             {
@@ -33,7 +33,7 @@ public class OneClassManyInstanceMockingTest {
     }
     // Mock方法二: 用@Mocked。适用场景： 类的所有实例都需要Mock，但不同实例也能保留不同的Mock逻辑
     @Test
-    public void testMocking2(@Mocked AnOrdinaryClass instance1, @Mocked AnOrdinaryClass instance2) {
+    public void testMocking2(@Mocked final AnOrdinaryClass instance1, @Mocked final AnOrdinaryClass instance2) {
         new Expectations() {
             {
                 instance1.ordinaryMethod();
@@ -52,7 +52,7 @@ public class OneClassManyInstanceMockingTest {
     }
     // Mock方法三: 用@Injectable。适用场景： 不是类的所有实例都需要Mock，不同实例也能保留不同的Mock逻辑
     @Test
-    public void testMocking3(@Injectable AnOrdinaryClass instance1, @Injectable AnOrdinaryClass instance2) {
+    public void testMocking3(@Injectable final AnOrdinaryClass instance1, @Injectable final AnOrdinaryClass instance2) {
         new Expectations() {
             {
                 instance1.ordinaryMethod();
