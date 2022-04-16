@@ -1,0 +1,200 @@
+1-Java NIO主要包含三个概念，即缓冲区（Buffer）、通道（Channel）和选择器（Selector）。前面的文章已经介绍了缓冲区和通道，下面我们看最复杂的选择器Selector。
+2-Selector涉及的三个概念
+	在理解了Buffer和Channel之后，终于来到了最终的解决方案面前，那就是使用Selector来实现单线程控制多路非阻塞IO。Selector是如此重要，可以说它就是NIO异步IO的核心控制器。Selector需要其他两种对象配合使用，即SelectionKey和SelectableChannel，
+	它们之间的关系如图selector.png所示。 
+		SelectableChannel是一类可以与Selector进行配合的通道，例如Socket相关通道以及Pipe产生的通道都属于SelectableChannel。这类通道可以将自己感兴趣的操作（例如read、write、accept和connect）注册到一个Selector上，并在Selector的控制下进行IO相关操作。 
+		Selector是一个控制器，它负责管理已注册的多个SelectableChannel，当这些通道的某些状态改变时，Selector会被唤醒（从select()方法的阻塞中），并对所有就绪的通道进行轮询操作。 
+		SelectionKey是一个用来记录SelectableChannel和Selector之间关系的对象，它由SelectableChannel的register()方法返回，并存储在Selector的多个集合中。它不仅记录了两个对象的引用，还包含了SelectableChannel感兴趣的操作，即OP_READ，OP_WRITE，OP_ACCEPT和OP_CONNECT。
+	2.1 register方法
+		在展示例子代码之前，必须对一些概念和操作进行简要的介绍。首先是SelectableChannel的register方法，它的正式定义为：
+			SelectionKey register(Selector sel, int ops)
+			第一个参数指明要注册的Selector，
+			第二个参数指明本通道感兴趣的操作，此参数的取值可以是SelectionKey.OP_ACCEPT等四个，以及它们的逻辑值，例如SelectionKey.OP_READ & SelectionKey.OP_WRITE。
+			方法的返回值是一个SelectionKey，这个对象会被自动加入Selector的keys集合，因此不必特意保留这个SelectionKey的对象引用，需要时可以使用Selector的keys()方法得到所有的SelectionKey对象引用。 
+		注册完成后，该通道就与Selector保持关联了。当通道的状态改变时，其改变会自动被Selector感知，并在Selector的三个集合中反应出来。
+	2.2 Selector的三个集合
+		如selector.png图所示，Selector对象会维持三个SelectionKey集合，分别是
+			keys集合，
+				存储了所有与Selector关联的SelectionKey对象；
+			selectedKeys集合，
+				存储了在一次select()方法调用后，所有状态改变的通道关联的SelectionKey对象；
+			cancelledKeys集合，
+				存储了一轮select()方法调用过程中，所有被取消但还未从keys中删除的SelectionKey对象。 
+		其中最值得关注的是selectedKeys集合，它使用Selector对象的selectedKeys()方法获得，并通常会进行轮询处理。
+	2.3 select方法
+		Selector类的select()方法是一个阻塞方法，它有两种形式： 
+		int select() 
+		int select(long timeout) 
+		不带参数的方法会一直阻塞，直到至少有一个注册的通道状态改变，才会被唤醒；带有timeout参数的方法会一直阻塞，直到时间耗尽，或者有通道的状态改变。
+	2.4 轮询处理
+		在一次select()方法返回后，应对selectedKeys集合中的所有SelectionKey对象进行轮询操作，并在操作完成后手动将SelectionKey对象从selectedKeys集合中删除。
+3-selector代码实例：
+	在展示具体的代码之前，先画一个从《Netty In Action》书上抄来的图，selector代码流程
+	服务端代码：
+		public class SelectorServer {
+		    private static final int PORT = 1234;
+		    private static ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+		    public static void main(String[] args) {
+		        try {
+		            ServerSocketChannel ssc = ServerSocketChannel.open();
+		            ssc.bind(new InetSocketAddress(PORT));
+		            ssc.configureBlocking(false);	//如果一个 Channel 要注册到 Selector 中, 那么这个 Channel 必须是非阻塞的,
+		            //即channel.configureBlocking(false);不能将FileChannel与Selector一起使用,因为FileChannel不能切换到非阻塞模式
+		            //另外通道一旦被注册，将不能再回到阻塞状态，此时若调用通道的configureBlocking(true)将抛出BlockingModeException异常
+		            //1.register()
+		            Selector selector = Selector.open();
+		            ssc.register(selector, SelectionKey.OP_ACCEPT);
+		            System.out.println("REGISTER CHANNEL , CHANNEL NUMBER IS:" + selector.keys().size());
+
+		            while (true) {
+		                //2.select()
+		                int n = selector.select();
+		                if (n == 0) {
+		                    continue;
+		                }
+		                //3.轮询SelectionKey
+		                Iterator<SelectionKey> iterator = (Iterator) selector.selectedKeys().iterator();
+		                while (iterator.hasNext()) {
+		                    SelectionKey key = iterator.next();
+		                    //如果满足Acceptable条件，则必定是一个ServerSocketChannel
+		                    if (key.isAcceptable()) {
+		                        ServerSocketChannel sscTemp = (ServerSocketChannel) key.channel();
+		                        //得到一个连接好的SocketChannel，并把它注册到Selector上，兴趣操作为READ
+		                        SocketChannel socketChannel = sscTemp.accept();
+		                        socketChannel.configureBlocking(false);
+		                        socketChannel.register(selector, SelectionKey.OP_READ);
+		                        System.out.println("REGISTER CHANNEL , CHANNEL NUMBER IS:" + selector.keys().size());
+		                    }
+		                    if (key.isConnectable()) {
+						        // a connection was established with a remote server.
+						 
+						    }
+						    if (key.isWritable()) {
+						        // a channel is ready for writing
+						    }
+		                    //如果满足Readable条件，则必定是一个SocketChannel
+		                    if (key.isReadable()) {
+		                        //读取通道中的数据
+		                        SocketChannel channel = (SocketChannel) key.channel();
+		                        readFromChannel(channel);
+		                    }
+		                    //4.remove SelectionKey
+		                    iterator.remove();
+		                    //在每次迭代时, 我们都调用 "keyIterator.remove()" 将这个 key 从迭代器中删除, 因为 select() 
+		                    //方法仅仅是简单地将就绪的 IO 操作放到 selectedKeys 集合中, 因此如果我们从 selectedKeys 获取到一个 key, 
+		                    //但是没有将它删除, 那么下一次 select 时, 这个 key 所对应的 IO 事件还在 selectedKeys 中.
+							//例如此时我们收到 OP_ACCEPT 通知, 然后我们进行相关处理, 但是并没有将这个 Key 从 SelectedKeys 中删除, 
+							//那么下一次 select() 返回时 我们还可以在 SelectedKeys 中获取到 OP_ACCEPT 的 key.
+							//注意, 我们可以动态更改 SekectedKeys 中的 key 的 interest set. 例如在 OP_ACCEPT 中, 我们可以将 
+							//interest set 更新为 OP_READ, 这样 Selector 就会将这个 Channel 的 读 IO 就绪事件包含进来了.
+		                }
+		            }
+		        } catch (IOException e) {
+		            e.printStackTrace();
+		        }
+		    }
+
+		    private static void readFromChannel(SocketChannel channel) {
+		        buffer.clear();
+		        try {
+		            while (channel.read(buffer) > 0) {
+		                buffer.flip();
+		                byte[] bytes = new byte[buffer.remaining()];
+		                buffer.get(bytes);
+		                System.out.println("READ FROM CLIENT:" + new String(bytes));
+		            }
+		        } catch (IOException e) {
+		            e.printStackTrace();
+		        }
+		    }
+		}
+		首先注册了一个ServerSocketChannel，它用来监听1234端口上的连接；当监听到连接时，把连接上的SocketChannel再注册到Selector上，这些SocketChannel注册的是SelectionKey.OP_READ事件；当这些SocketChannel状态变为可读时，读取数据并显示。 
+		客户端代码：
+		public class SelectorClient {
+		    static class Client extends Thread {
+		        private String name;
+		        private Random random = new Random(47);
+
+		        Client(String name) {
+		            this.name = name;
+		        }
+
+		        @Override
+		        public void run() {
+		            try {
+		                SocketChannel channel = SocketChannel.open();
+		                channel.configureBlocking(false);
+		                channel.connect(new InetSocketAddress(1234));
+		                while (!channel.finishConnect()) {
+		                    TimeUnit.MILLISECONDS.sleep(100);
+		                }
+		                ByteBuffer buffer = ByteBuffer.allocate(1024);
+		                for (int i = 0; i < 5; i++) {
+		                    TimeUnit.MILLISECONDS.sleep(100 * random.nextInt(10));
+		                    String str = "Message from " + name + ", number:" + i;
+		                    buffer.put(str.getBytes());
+		                    buffer.flip();
+		                    while (buffer.hasRemaining()) {
+		                        channel.write(buffer);
+		                    }
+		                    buffer.clear();
+		                }
+		                channel.close();
+		            } catch (IOException e) {
+		                e.printStackTrace();
+		            } catch (InterruptedException e) {
+		                e.printStackTrace();
+		            }
+		        }
+		    }
+
+		    public static void main(String[] args) {
+		        ExecutorService executorService = Executors.newCachedThreadPool();
+		        executorService.submit(new Client("Client-1"));
+		        executorService.submit(new Client("Client-2"));
+		        executorService.submit(new Client("Client-3"));
+		        executorService.shutdown();
+		    }
+		}
+		客户端创建了三个线程，每个线程创建一个SocketChannel通道，并连接到服务器，并向服务器发送5条消息。
+	Selector 基本使用流程：
+		通过 Selector.open() 打开一个 Selector.
+			1、将 Channel 注册到 Selector 中, 并设置需要监听的事件(interest set)
+			2、不断重复:
+				1）调用 select() 方法
+				2）调用 selector.selectedKeys() 获取 selected keys
+				3）迭代每个 selected key:
+					1）从 selected key 中获取 对应的 Channel 和附加信息(如果有的话)
+					2）判断是哪些 IO 事件已经就绪了, 然后处理它们. 如果是 OP_ACCEPT 事件, 则调用 "SocketChannel clientChannel = ((ServerSocketChannel) key.channel()).accept()" 获取 SocketChannel, 并将它设置为 非阻塞的, 然后将这个 Channel 注册到 Selector 中.
+					3）根据需要更改 selected key 的监听事件.
+					4）将已经处理过的 key 从 selected keys 集合中删除.
+4- 为SelectionKey绑定附加对象
+	可以将一个或者多个附加对象绑定到SelectionKey上，以便容易的识别给定的通道。通常有两种方式： 
+		1. 在注册的时候直接绑定： 
+			SelectionKey key=channel.register(selector,SelectionKey.OP_READ,theObject); 
+		2. 在绑定完成之后附加： 
+			selectionKey.attach(theObject);//绑定
+			绑定之后，可通过对应的SelectionKey取出该对象: 
+			selectionKey.attachment();。 
+			如果要取消该对象，则可以通过该种方式: 
+			selectionKey.attach(null).
+		需要注意的是如果附加的对象不再使用，一定要人为清除，因为垃圾回收器不会回收该对象，若不清除的话会成内存泄漏。
+	一个单独的通道可被注册到多个选择器中，有些时候我们需要通过isRegistered（）方法来检查一个通道是否已经被注册到任何一个选择器上。 通常来说，我们并不会这么做。
+5- select()过程：
+		我们知道调用select（）方法进行通道，现在我们再来深入一下选择的过程，也就是select（）执行过程。当select（）被调用时将执行以下几步：
+			1）首先检查已取消键集合，也就是通过cancle()取消的键。如果该集合不为空，则清空该集合里的键，同时该集合中每个取消的键也将从已注册键集合和已选择键集合中移除。（一个键被取消时，并不会立刻从集合中移除，而是将该键“拷贝”至已取消键集合中，这种取消策略就是我们常提到的“延迟取消”。）
+			2）再次检查已注册键集合（准确说是该集合中每个键的interest集合）。系统底层会依次询问每个已经注册的通道是否准备好选择器所感兴趣的某种操作，一旦发现某个通道已经就绪了，则会首先判断该通道是否已经存在在已选择键集合当中，如果已经存在，则更新该通道在已注册键集合中对应的键的ready集合，如果不存在，则首先清空该通道的对应的键的ready集合，然后重设ready集合，最后将该键存至已注册键集合中。这里需要明白，当更新ready集合时，在上次select（）中已经就绪的操作不会被删除，也就是ready集合中的元素是累积的，比如在第一次的selector对某个通道的read和write操作感兴趣，在第一次执行select（）时，该通道的read操作就绪，此时该通道对应的键中的ready集合存有read元素，在第二次执行select()时，该通道的write操作也就绪了，此时该通道对应的ready集合中将同时有read和write元素。
+		深入已注册键集合的管理
+			到现在我们已经知道一个通道的的键是如何被添加到已选择键集合中的，下面我们来继续了解对已选择键集合的管理 。首先要记住：选择器不会主动删除被添加到已选择键集合中的键，而且被添加到已选择键集合中的键的ready集合只能被设置，而不能被清理。如果我们希望清空已选择键集合中某个键的ready集合该怎么办？我们知道一个键在新加入已选择键集合之前会首先置空该键的ready集合，这样的话我们可以人为的将某个键从已注册键集合中移除最终实现置空某个键的ready集合。被移除的键如果在下一次的select（）中再次就绪，它将会重新被添加到已选择的键的集合中。这就是为什么要在每次迭代的末尾调用keyIterator.remove()。
+6-停止选择
+	选择器执行选择的过程，系统底层会依次询问每个通道是否已经就绪，这个过程可能会造成调用线程进入阻塞状态,那么我们有以下三种方式可以唤醒在select（）方法中阻塞的线程。
+		1）通过调用Selector对象的wakeup（）方法让处在阻塞状态的select()方法立刻返回 
+			该方法使得选择器上的第一个还没有返回的选择操作立即返回。如果当前没有进行中的选择操作，那么下一次对select()方法的一次调用将立即返回。
+		2）通过close（）方法关闭Selector
+			该方法使得任何一个在选择操作中阻塞的线程都被唤醒（类似wakeup（）），同时使得注册到该Selector的所有Channel被注销，所有的键将被取消，但是Channel本身并不会关闭。
+		3）调用interrupt() 
+			调用该方法会使睡眠的线程抛出InterruptException异常，捕获该异常并在调用wakeup()
+6- 小结
+	Selector是Java NIO的核心概念，以至于一些人直接将NIO称之为Selector-based IO。要学会Selector的使用首先是要明白其相关的多个概念，并多多动手去写。 
+	至此《Java NIO编程实例》系列的三篇就写完了，接下来应该好好了解一下Netty了，毕竟它才是在具体的Java服务端编程用得最多的框架。Netty克服了NIO中一些概念和设计上的不足之处，提供了更加优雅的解决方案。但是，要学好用好Netty，学习NIO是必经之路，有了NIO的基础，才能真正学好Netty。 

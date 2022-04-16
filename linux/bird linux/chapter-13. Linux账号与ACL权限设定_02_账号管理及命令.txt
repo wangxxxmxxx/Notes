@@ -1,0 +1,285 @@
+1、账号管理
+	1）新增与移除使用者： useradd, 相关配置文件, passwd, usermod, userdel
+		1. useradd [-u UID] [-g 初始群组] [-G 次要群组] [-mM] [-c 说明栏] [-d 家目录绝对路径] [-s shell] 使用者账号名
+			1-选项与参数：
+				-u ：后面接的是UID，是一组数字。直接指定一个特定的 UID 给这个账号
+				-g ：后面接的那个组名initial group，该群组的GID会被放置到/etc/passwd的第四个字段内。
+				-G ：后面接的组名则是这个账号还可以加入的群组。这个选项与参数会修改 /etc/group 内的相关资料
+				-M ：强制！不要建立用户家目录！(系统账号默认值)
+				-m ：强制！要建立用户家目录！(一般账号默认值)
+				-c ：这个就是 /etc/passwd 的第五栏的说明内容，可以随便设定
+				-d ：指定某个目录成为家目录，而不要使用默认值。务必使用绝对路径！
+				-r ：建立一个系统的账号，这个账号的 UID 会有限制 (参考 /etc/login.defs)
+				-s ：后面接一个 shell ，若没有指定则预设是 /bin/bash
+				-e ：后面接一个日期，格式为『YYYY-MM-DD』此项目可写入 shadow 第八字段，即账号失效日的设定
+				-f ：后面接 shadow 的第七字段项目，指定密码是否会失效。0 为立刻失效，-1 为永远不失效(密码只会过期而强制于登入时重新设定而已。)
+			2-eg:
+				创建一个用户：
+					$ useradd username
+						默认会建立用户家目录，且权限为 700,系统已经帮我们规定好非常多的默认值，一般仅使用以上例子添加用户即可:
+							在/etc/passwd 里面建立一行与账号相关的数据，包括建立UID/GID/家目录等；
+							在/etc/shadow 里面将此账号的密码相关参数填入，但是尚未有密码；还需要使用passwd username 来给予密码完成用户建立
+							在/etc/group 里面加入一个与账号名称一模一样的组名；
+							在/home 底下建立一个与账号同名的目录作为用户家目录，且权限为700
+				假设系统当中有个组名为 users ，且 UID 1500 并不存在，以users 为初始群组，uid为1500建立一个账号：
+					$ useradd -u 1500 -g users username
+				建立一个系统账号：
+					$ useradd -r username
+						默认情况：
+							系统账号默认都不会主动建立家目录
+							将账号与账号同名群组的UID/GID 都指定小于1000 以下
+			3-useradd创建用户时，涉及改动的文件
+				用户账号与密码参数方面的文件：/etc/passwd, /etc/shadow
+				使用者群组相关方面的文件：/etc/group, /etc/gshadow
+				用户的家目录：/home/账号名称
+			4-useradd默认值来源：
+				1)$ useradd -D          #数据其实来自/etc/default/useradd
+					GROUP=100	#预设的群组
+					HOME=/home	#默认的家目录所在目录
+					INACTIVE=-1	#密码失效日，在 shadow 内的第 7 栏
+					EXPIRE=		#账号失效日，在 shadow 内的第 8 栏
+					SHELL=/bin/bash		#预设的 shell
+					SKEL=/etc/skel		#用户家目录的内容数据参考目录
+					CREATE_MAIL_SPOOL=yes	#是否主动帮使用者建立邮件信箱(mailbox)
+				2)/etc/default/useradd
+					GROUP=100：新建账号的初始群组GID为100
+						GID为100者即是users这个群组,但是CentOS上面并不是这样，预设的群组为与账号名相同的群组。这是因为针对群组的角度有两种不同的机制所致，这两种机制分别是：
+							a-私有群组机制:
+								系统会建立一个与账号一样的群组给使用者作为初始群组。 这种群组的设定机制会比较有保密性，这是因为使用者都有自己的群组，而且家目录权限将会设定为700 (仅有自己可进入自己的家目录)之故。使用这种机制将不会参考GROUP=100 这个设定值。代表性的distributions 有RHEL,Fedora, CentOS 等
+							b-公共群组机制：
+								就是以GROUP=100 这个设定值作为新建账号的初始群组，因此每个账号都属于users 这个群组，且默认家目录通常的权限会是『drwxr-xr-x ... username users ... 』，由于每个账号都属于users 群组，因此大家都可以互相分享家目录内的数据之故。代表distributions 如SuSE 等。
+					HOME=/home：用户家目录的基准目录(basedir)
+					INACTIVE=-1：密码过期后是否会失效的设定值
+						shadow文件第七个字段的设定值会影响到密码过期后，在多久时间内还可使用旧密码登入。如果是0代表密码过期立刻失效，如果是-1 则是代表密码永远不会失效，如果是数字，如30，则代表过期30天后才失效。
+					EXPIRE=：账号失效的日期
+						shadow 内的第八字段，直接设定账号在哪个日期后就直接失效，而不理会密码的问题。通常不会设定，但如果是付费的会员制系统，或许这个字段可以设定！
+					SHELL=/bin/bash：默认使用的shell 程序文件名
+						不许用户登入系统取得 shell ，那么可以将这里设定为/sbin/nologin
+					SKEL=/etc/skel：用户家目录参考基准目录
+						指定用户家目录的参考基准目录,家目录/home/user内的各项数据，都是由/etc/skel 所复制过去的
+					CREATE_MAIL_SPOOL=yes：建立使用者的mailbox
+						你可以使用ll /var/spool/mail/user,会发现有这个文件的存在.这是使用者的邮件信箱！
+				3)除了这些基本的账号设定值之外， UID/GID 还有密码参数要看一下/etc/login.defs这个文件
+					MAIL_DIR /var/spool/mail          #用户默认邮件信箱放置目录
+					PASS_MAX_DAYS 99999          #/etc/shadow 内的第 5 栏，多久需变更密码日数
+					PASS_MIN_DAYS 0          #/etc/shadow 内的第 4 栏，多久不可重新设定密码日数
+					PASS_MIN_LEN 5          #密码最短的字符长度，已被 pam 模块取代，失去效用！
+					PASS_WARN_AGE 7          #/etc/shadow 内的第 6 栏，过期前会警告的日数
+					UID_MIN 1000          #使用者最小的 UID，意即小于 1000 的 UID 为系统保留
+					UID_MAX 60000          #使用者能够用的最大 UID
+					SYS_UID_MIN 201          #保留给用户自行设定的系统账号最小值 UID
+					SYS_UID_MAX 999          #保留给用户自行设定的系统账号最大值 UID
+					GID_MIN 1000          #使用者自定义组的最小 GID，小于 1000 为系统保留
+					GID_MAX 60000          #使用者自定义组的最大 GID
+					SYS_GID_MIN 201          #保留给用户自行设定的系统账号最小值 GID
+					SYS_GID_MAX 999          #保留给用户自行设定的系统账号最大值 GID
+					CREATE_HOME yes          #在不加 -M 及 -m 时，是否主动建立用户家目录？
+					UMASK 077          #用户家目录建立的 umask ，因此权限会是 700
+					USERGROUPS_ENAB yes          #使用 userdel 删除时，是否会删除初始群组
+					ENCRYPT_METHOD SHA512          #密码加密的机制使用的是 sha512 这一个机制！
+					总结主要有以下几个方面：
+						mailbox 所在目录
+ 						shadow 密码第4, 5, 6 字段内容：
+							透过 PASS_MAX_DAYS 等等设定值来指定的。所以预设的/etc/shadow 内每一行都会有0:99999:7。不过要注意的是，由于目前登入时改用PAM 模块来进行密码检验，所以那个PASS_MIN_LEN是失效的。
+ 						UID/GID 指定数值：
+							虽然 Linux 核心支持的账号可高达232 这么多个，不过一部主机要作出这么多账号在管理上也是很麻烦的！所以在这里就针对UID/GID 的范围进行规范就是了。上表中的UID_MIN 指的就是可登入系统的一般账号的最小UID ，至于UID_MAX 则是最大UID 之意。
+							要注意的是，系统给予一个账号UID 时：
+								(1)先参考UID_MIN 设定值取得最小数值； 
+								(2)由/etc/passwd 搜寻最大的UID 数值， 将 (1) 与(2) 相比，找出最大的那个再加一就是新账号的UID 了。
+ 						用户家目录设定值：
+							CREATE_HOME = yes设定会让在使用useradd 时， 主动加入-m这个产生家目录的选项！如果不想要建立用户家目录，就只能强制加上-M的选项！透过umask设定用户家目录默认权限
+ 						用户删除与密码设定值：
+							使用USERGROUPS_ENAB yes这个设定如果使用userdel去删除一个账号，且该账号所属的初始群组已经没有人隶属于该群组了，那么就删除掉该群组。ENCRYPT_METHOD SHA512』则表示使用SHA512 来加密密码明文，而不使用旧式的MD5。
+			5-useradd创建用户时，参考的文件：
+				/etc/default/useradd
+				/etc/login.defs
+				/etc/skel/*
+		2. 使用 useradd 建立了账号之后，在预设的情况下，该账号是暂时被封锁的，该账号是无法登入的,原因可以去查看/etc/shadow 内的第二个字段
+			passwd [--stdin] [账号名称]		#所有人均可使用来改自己的密码	
+			passwd [-l] [-u] [--stdin] [-S] [-n 日数] [-x 日数] [-w 日数] [-i 日期] 账号  	#root的功能
+			1-选项与参数：
+				--stdin ：可以透过来自前一个管线的数据，作为密码输入，使用shell script有用
+				-l ：是 Lock 的意思，会将 /etc/shadow 第二栏最前面加上 ! 使密码失效；
+				-u ：与 -l 相对，是 Unlock 的意思！
+				-S ：列出密码相关参数，亦即 shadow 文件内的大部分信息。
+				-n ：后面接天数，shadow 的第 4 字段，多久不可修改密码天数
+				-x ：后面接天数，shadow 的第 5 字段，多久内必须要更动密码
+				-w ：后面接天数，shadow 的第 6 字段，密码过期前的警告天数
+				-i ：后面接『日期』，shadow 的第 7 字段，密码失效日期
+			2-eg:
+				当我们要给予用户密码时，透过root 来设定即可。root 可以设定各式各样的密码，系统几乎一定会接受，自己修改密码就会有所限制。
+					$ passwd user	
+				后面不加账号名称就是修改自己的密码
+					$ passwd
+						密码的规范是非常严格的，尤其新的distributions大多使用PAM 模块来进行密码的检验，这个管理的机制写在/etc/pam.d/passwd 当中，该文件与密码有关的测试模块就是使用：pam_cracklib.so，这个模块会检验密码相关的信息，并且取代 /etc/login.defs 内的PASS_MIN_LEN的设定，密码包括太短、密码与账号相同、密码为字典常见字符串等，都会被PAM 模块检查出来而拒绝修改密码, 与一般使用者不同的是， root并不需要知道旧密码就能够帮用户或root自己建立新密码，密码最好符合一下要求：
+							密码不能与账号相同；
+							 密码尽量不要选用字典里面会出现的字符串；
+							 密码需要超过8 个字符；
+							 密码不要使用个人信息，如身份证、手机号码、其他电话号码等；
+							 密码不要使用简单的关系式，如1+1=2， Iamvbird 等；
+							 密码尽量使用大小写字符、数字、特殊字符($,_,-等)的组合。
+				使用standard input建立用户的密码：
+					$ echo "word" | passwd --stdin username
+						这个动作会直接更新用户的密码而不用再次的手动输入。好处是方便处理，缺点是这个密码会保留在指令中，未来若系统被攻破，可以在/root/.bash_history 找到这个密码呢。所以这个动作通常仅用在shell script 的大量建立使用者账号当中。注意，这个选项并不存在所有distributions 版本中， 请使用 man passwd 确认你的distribution 是否有支持此选项
+				设定部分规则：
+					$ passwd -S username
+						username PS 2018-10-20 0 99999 7 -1 (Password set, SHA512 crypt.)
+						# 上面说明密码建立时间 (2015-07-20)、0 不可被更动天数、99999 必须要变更天数、7 需要变更前警告日数与密码不会失效 (-1)
+					$ passwd -x 60 -i 10 username
+					$ passwd -S username
+						username PS 2018-10-20 0 60 7 10 (Password set, SHA512 crypt.)
+						# 上面说明密码建立时间 (2015-07-20)、0 不可被更懂天数、60 必须要变更天数、7 需要变更前警告日数与密码不会失效 (-1)
+				禁用账号：
+					$ passwd -l username
+						username LK 2018-10-20 0 60 7 10 (Password locked.)
+						#查看/etc/shadow可以发现密码字段前加上了感叹号
+		3. 除了使用passwd -S 之外，更详细的密码参数显示功能就是chage
+			chage [-ldEImMW] username
+			1-选项与参数：
+				-l ：列出该账号的详细密码参数；(比使用passwd -S 显示的更清楚)
+				-d ：后面接日期，修改 shadow 第三字段(最近一次更改密码的日期)，格式 YYYY-MM-DD
+				-E ：后面接日期，修改 shadow 第八字段(账号失效日)，格式 YYYY-MM-DD
+				-I ：后面接天数，修改 shadow 第七字段(密码失效日期)
+				-m ：后面接天数，修改 shadow 第四字段(密码最短保留天数)
+				-M ：后面接天数，修改 shadow 第五字段(密码多久需要进行变更)
+				-W ：后面接天数，修改 shadow 第六字段(密码过期前警告日期)
+			2-eg:
+				chage可以修改第三个字段，所以可以在使用者在第一次登入时， 强制她们一定要更改密码后才能够使用系统资源：
+					$ useradd agetest
+					$ echo "agetest" | passwd --stdin agetest
+					$ chage -d 0 agetest
+					$ chage -l agetest | head -n 3  
+						# 此时账号的密码建立时间会被改为 1970/1/1 ，所以登录会有问题！密码已经过期，需要你修改密码
+		4. 在使用 useradd 后，发现某些地方还可以进行细部修改。此时，当然我们可以直接到/etc/passwd或/etc/shadow去修改相对应字段的数据，或者使用usermod,他与useradd非常类似，因为它用来微调useradd的
+			usermod [-cdegGlsuLU] username
+			1-选项与参数：
+				-c ：后面接账号的说明，即/etc/passwd 第五栏的说明栏
+				-d ：后面接账号的家目录，即修改 /etc/passwd 的第六栏；
+				-e ：后面接日期，格式是 YYYY-MM-DD 也就是在 /etc/shadow 内的第八个字段
+				-f ：后面接天数，为 shadow 的第七字段
+				-g ：后面接初始群组，修改/etc/passwd 的第四个字段，即GID字段
+				-G ：后面接次要群组，修改这个使用者能够支持的群组，修改的是/etc/group
+				-a ：与 -G 合用，可『增加次要群组的支持』而非设定
+				-l ：后面接账号名称。亦即是修改账号名称，/etc/passwd 的第一栏！
+				-s ：后面接 Shell 的实际文件，例如 /bin/bash 或 /bin/csh 等等。
+				-u ：后面接 UID 数字,即/etc/passwd第三栏的资料
+				-L ：暂时将用户的密码冻结，让他无法登入。其实仅改/etc/shadow的密码栏。
+				-U ：将 /etc/shadow 密码栏的 ! 拿掉解锁
+			2-eg:
+				修改使用者的说明栏
+					$ usermod -c "user's description" username
+				使用者账号在 2018/12/31 失效。
+					$ usermod -e "2018-12-31" username
+					$ chage -l username | grep 'Account expires'
+				建立系统账号时并没有给予家目录
+					$ cp -a /etc/skel /home/username
+					$ chown -R username:username /home/username
+					$ chmod 700 /home/username
+		5. userdel目的在删除用户的相关数据，而用户的数据有：
+			用户账号/密码相关参数：/etc/passwd, /etc/shadow
+			使用者群组相关参数：/etc/group, /etc/gshadow
+			用户个人文件数据： /home/username, /var/spool/mail/username
+			userdel [-r] username
+			1-选项与参数：
+				-r ：连同用户的家目录也一起删除
+			2-注意事项：
+				这个指令下达的时候要小心,通常我们要移除一个账号，手动将 /etc/passwd与/etc/shadow 里头的该账号取消即可，如果该账号只是『暂时不启用』的话，那么将/etc/shadow 里头账号失效日期 (第八字段) 设定为 0 就可以让该账号无法使用，但是所有跟该账号相关的数据都会留下来！使用 userdel是『确定不要让该用户在主机上面使用任何数据了』
+				另外，其实用户如果在系统上面操作过一阵子了，那么该用户其实在系统内可能会含有其他文件的。举例来说，他的邮件信箱 (mailbox) 或者是例行性工作排程 (crontab, 十五章) 之类的文件。 所以，如果想要完整的将某个账号完整的移除，最好可以在下达 userdel -r username 之前， 先以『 find /-user username 』查出整个系统内属于 username 的文件，然后再删除
+	2）用户功能，以上命令，大多都是系统管理员所能够使用的指令，一般身份使用者，除了密码之外，也可以更改一些数据
+		1. id 可以查询某人或自己的相关 UID/GID 等等的信息，他的参数也不少，不过，都不需要记，使用 id 就全部都列出啰！ 
+			 id [username] 不添加username是自己的相关信息
+		2. finger finger可以查阅很多用户相关的信息, 大部分都是在/etc/passwd这个文件里面的信息,不过，这个指令有点危险，所以新的版本中已经默认不安装这个软件
+			finger [-s] username
+			1-选项与参数：
+				-s ：仅列出用户的账号、全名、终端机代号与登入时间等等；
+				-m ：列出与后面接的账号相同者，而不是利用部分比对 (包括全名部分)
+			2-eg:
+				观察用户相关账号属性
+					$ finger username
+						由于finger 类似指纹的功能，他会将用户的相关属性列出来,其实他列出来的几乎都是/etc/passwd 文件里面的东西。
+						列出的信息说明如下：
+						 Login：为使用者账号，亦即/etc/passwd 内的第一字段；
+						 Name：为全名，亦即/etc/passwd 内的第五字段(或称为批注)；
+						 Directory：就是家目录了；
+						 Shell：就是使用的Shell 文件所在；
+						 Never logged in.：figner 还会检查用户登入主机的情况
+						 No mail.：/var/spool/mail 当中的信箱资料；
+						 No Plan.：~vbird1/.plan 文件，并将该文件取出来说明
+				找出目前在系统上面登入的用户与登入时间
+					$ finger
+		3. chfn [-foph] [账号名]
+			1-选项与参数：
+				-f ：后面接完整的大名；
+				-o ：您办公室的房间号码；
+				-p ：办公室的电话号码；
+				-h ：家里的电话号码！
+			2-eg:
+				更改一下自己的相关信息
+					$ chfn
+						接下来会提示输入号码等信息，最终输入一下密码确认。
+						其实修改的是/etc/passwd的第五个字段
+			3-注意事项：
+				finger/chfn,这两个指令除非是你的主机有很多的用户，否则倒真是用不着
+		4. chsh [-ls]
+			1-选项与参数：
+				-l ：列出目前系统上面可用的shell ，其实就是/etc/shells 的内容
+				-s ：设定修改自己的 Shell
+			2-eg:
+				列出合法shell
+					$ chsh -l
+				更改shell
+					$ chsh -s /bin/csh; grep username /etc/passwd
+		5. 不论是chfn与chsh，都是能够让一般用户修改/etc/passwd 这个系统文件的！所以这两个文件的权限一定是SUID的功能
+2、新增与移除群组
+	1）群组的内容都与这两个文件有关/etc/group,/etc/gshadow。群组的内容其实很简单，都是上面两个文件的新增、修改与移除而已。
+		1. groupadd [-g gid] [-r] 组名
+			1-选项与参数：
+				-g ：后面接某个特定的 GID ，用来直接给予某个GID
+				-r ：建立系统群组。与/etc/login.defs内的 GID_MIN有关。
+			2-eg:
+				新建一个群组
+					$ groupadd group1
+					$ grep group1 /etc/group /etc/gshadow
+		2. groupmod [-g gid] [-n group_name] 群组名
+			1-选项与参数：
+				-g ：修改既有的 GID 数字；
+				-n ：修改既有的组名
+			2-eg：
+				将刚刚上个指令建立的 group1 名称改为mygroup，GID为201
+					$ groupmod -g 201 -n mygroup group1
+					$ grep mygroup /etc/group /etc/gshadow
+			3-注意事项：
+				不要随意的更动GID容易造成系统资源错乱
+		3. groupdel [groupname]
+			1-注意事项：
+				有某个账号(/etc/passwd) 的initial group 使用该群组。则无法删除，必须要确认/etc/passwd内的账号没有任何人使用该群组作为initial group才行。
+		4. 如果系统管理员太忙碌，某些账号想要加入某个项目时可以建立『群组管理员，就是让某个群组具有一个管理员，这个群组管理员可以管理哪些账号可以加入/移出该群组
+			1-关于系统管理员(root)做的动作：
+				gpasswd groupname
+				gpasswd [-A user1,...] [-M user3,...] groupname
+				gpasswd [-rR] groupname
+				选项与参数：
+					   ：若没有任何参数时，表示给予 groupname 一个密码(/etc/gshadow)
+					-A ：将 groupname 的主控权交由后面的使用者管理(该群组的管理员)
+					-M ：将某些账号加入这个群组当中！
+					-r ：将 groupname 的密码移除
+					-R ：让 groupname 的密码栏失效
+			2-关于群组管理员(Group administrator)做的动作：
+				gpasswd [-ad] user groupname
+				选项与参数：
+					-a ：将某位使用者加入到 groupname 这个群组当中！
+					-d ：将某位使用者移除出 groupname 这个群组当中。
+			3-eg：
+				建立一个新群组，名称为 testgroup 且群组交由 vbird1 管理
+					$ groupadd testgroup
+					$ gpasswd testgroup
+					$ gpasswd -A vbird1 testgroup
+					$ grep testgroup /etc/group /etc/gshadow
+		
+			
+
+
+
+
+
+
